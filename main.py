@@ -1,9 +1,6 @@
 """
 Main scripts to start experiments.
 Takes a flag --env-type (see below for choices) and loads the parameters used in the paper.
-
-Copyright Luisa Zintgraf,
-February 2020.
 """
 import argparse
 import glob
@@ -25,10 +22,7 @@ from metalearner import MetaLearner
 
 def main():
     parser = argparse.ArgumentParser()
-    # parser.add_argument('--env-type', default='gridworld_belief_oracle')
     parser.add_argument('--env-type', default='gridworld_varibad')
-    # parser.add_argument('--env-type', default='mujoco_cheetah_dir_varibad')
-    # parser.add_argument('--env-type', default='mujoco_walker_varibad')
     args, rest_args = parser.parse_known_args()
     env = args.env_type
 
