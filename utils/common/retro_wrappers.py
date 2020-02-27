@@ -1,8 +1,6 @@
 """
 Taken from https://github.com/openai/baselines
 """
-import gym
-import numpy as np
 
 # flake8: noqa F403, F405
 from .atari_wrappers import *

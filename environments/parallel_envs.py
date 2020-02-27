@@ -10,9 +10,9 @@ import torch
 from environments.wrappers import TimeLimitMask
 from environments.wrappers import VariBadWrapper
 from utils import bench
+from utils.common.vec_env import VecEnvWrapper
 from utils.common.vec_env.dummy_vec_env import DummyVecEnv
 from utils.common.vec_env.subproc_vec_env import SubprocVecEnv
-from utils.common.vec_env import VecEnvWrapper
 from utils.common.vec_env.vec_normalize import VecNormalize as VecNormalize_
 
 
@@ -38,10 +38,8 @@ def make_env(env_id, seed, rank, log_dir, allow_early_resets,
 
 
 def make_vec_envs(env_name, seed, num_processes, gamma, log_dir,
-                  device, allow_early_resets,
-                  episodes_per_task,
-                  obs_rms, ret_rms,
-                  rank_offset=0, num_frame_stack=None,
+                  device, allow_early_resets, episodes_per_task,
+                  obs_rms, ret_rms, rank_offset=0,
                   **kwargs):
     """
     :param obs_rms: running mean and std for observations
@@ -113,6 +111,10 @@ class VecPyTorch(VecEnvWrapper):
         """
         If env does not have the attribute then call the attribute in the wrapped_env
         """
+
+        if attr in ['num_states', '_max_episode_steps']:
+            return self.unwrapped.get_env_attr(attr)
+
         try:
             orig_attr = self.__getattribute__(attr)
         except AttributeError:

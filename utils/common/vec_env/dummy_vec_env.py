@@ -109,3 +109,6 @@ class DummyVecEnv(VecEnv):
             return self.envs[0].unwrapped.reset_task(task)
         else:
             raise NotImplementedError
+
+    def get_env_attr(self, attr):
+        return getattr(self.envs[0].unwrapped, attr)

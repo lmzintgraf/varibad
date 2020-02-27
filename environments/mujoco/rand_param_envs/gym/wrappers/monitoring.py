@@ -1,7 +1,8 @@
 import json
 import logging
-import numpy as np
 import os
+
+import numpy as np
 import six
 
 from environments.mujoco.rand_param_envs.gym import Wrapper

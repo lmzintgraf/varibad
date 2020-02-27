@@ -1,4 +1,3 @@
-import gym
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -17,18 +16,12 @@ def evaluate(args,
              encoder=None,
              num_episodes=None
              ):
-
     env_name = args.env_name
     if hasattr(args, 'test_env_name'):
         env_name = args.test_env_name
-
-    # get some info about the env
-    env = gym.make(env_name)
     if num_episodes is None:
         num_episodes = args.max_rollouts_per_task
-    num_steps = env._max_episode_steps
     num_processes = args.num_processes
-    del env
 
     # --- set up the things we want to log ---
 
@@ -41,12 +34,13 @@ def evaluate(args,
 
     # --- initialise environments and latents ---
 
-    envs = make_vec_envs(env_name, seed=args.seed*42 + iter_idx, num_processes=num_processes,
+    envs = make_vec_envs(env_name, seed=args.seed * 42 + iter_idx, num_processes=num_processes,
                          gamma=args.policy_gamma, log_dir=args.agent_log_dir,
                          device=device, allow_early_resets=False,
-                         rank_offset=num_processes+1,  # to use diff tmp folders than main processes
+                         rank_offset=num_processes + 1,  # to use diff tmp folders than main processes
                          episodes_per_task=num_episodes,
                          obs_rms=obs_rms, ret_rms=ret_rms)
+    num_steps = envs._max_episode_steps
 
     # reset environments
     (obs_raw, obs_normalised) = envs.reset()
@@ -82,11 +76,11 @@ def evaluate(args,
             if encoder is not None:
                 # update the hidden state
                 latent_sample, latent_mean, latent_logvar, hidden_state = utl.update_encoding(encoder=encoder,
-                                                                                        next_obs=obs_raw,
-                                                                                        action=action,
-                                                                                        reward=rew_raw,
-                                                                                        done=None,
-                                                                                        hidden_state=hidden_state)
+                                                                                              next_obs=obs_raw,
+                                                                                              action=action,
+                                                                                              reward=rew_raw,
+                                                                                              done=None,
+                                                                                              hidden_state=hidden_state)
 
             # add rewards
             returns_per_episode[range(num_processes), task_count] += rew_raw.view(-1)
@@ -118,7 +112,7 @@ def visualise_behaviour(args,
                         ):
     # initialise environment
     env = make_vec_envs(env_name=args.env_name,
-                        seed=args.seed*42 + iter_idx,
+                        seed=args.seed * 42 + iter_idx,
                         num_processes=1,
                         gamma=args.policy_gamma,
                         log_dir=args.agent_log_dir,

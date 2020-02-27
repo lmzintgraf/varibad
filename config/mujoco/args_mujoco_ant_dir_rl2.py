@@ -80,7 +80,8 @@ def get_args(rest_args):
     parser.add_argument('--vae_buffer_add_thresh', type=float, default=0, help='prob of adding a new traj to buffer')
 
     # - encoder (now part of the policy!)
-    parser.add_argument('--aggregator_hidden_size', type=int, default=128, help='dimensionality of hidden state of the rnn')
+    parser.add_argument('--aggregator_hidden_size', type=int, default=128,
+                        help='dimensionality of hidden state of the rnn')
     parser.add_argument('--layers_before_aggregator', nargs='+', type=int, default=[])
     parser.add_argument('--layers_after_aggregator', nargs='+', type=int, default=[])
     parser.add_argument('--state_embedding_size', type=int, default=32)

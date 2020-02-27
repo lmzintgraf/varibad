@@ -8,6 +8,7 @@ except ImportError:
 
 import numpy as np
 import tensorflow as tf
+
 import utils.common.tf_util as U
 
 

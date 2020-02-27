@@ -62,6 +62,25 @@ You can overwrite any default hyperparameters using command line arguments.
 Results will be written to tensorboard event files, 
 and some visualisations will be printed every now and then.
 
+### Configs
+
+Some comments on the flags in the config files:
+- You can choose what type of decoder you by setting the respective flags to true: 
+`--decode_reward True` and/or `--decode_state True`.
+- You can also choose a task decoder (`--decode_task True`), which was proposed by 
+[Humplik et al. (2019)](https://arxiv.org/abs/1905.06424). 
+This method uses privileged information during meta-training (e.g., the task description or ID)
+to learn the posterior distribution in a supervised way. 
+(Note that our implementation is based on the variBAD architecture, 
+so differs slightly from theirs.)
+- The size of the latent dimension can be changed using `--latent_dim`.
+- In our experience, the performance of PPO depends a lot on the number of 
+minibatches (`--ppo_num_minibatch`), 
+the clip parameter (`--ppo_clip_param`, we suggest values between 0.01 and 0.3),
+and the batchsize (change with `--policy_num_steps` and/or `--num_processes`).
+Another important parameter is the kl term (`--kl_weight`) for the ELBO term.
+
+
 ### Comments
 
 - When the flag `disable_varibad` is activated, the file `learner.py` will be used instead of `metalearner.py`. 

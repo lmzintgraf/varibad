@@ -1,13 +1,13 @@
 """
 Taken from https://github.com/openai/baselines
 """
-import numpy as np
 import os
 import platform
 import shutil
 import subprocess
 from collections import defaultdict
 
+import numpy as np
 from mpi4py import MPI
 
 

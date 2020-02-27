@@ -42,11 +42,8 @@ class MetaLearner:
                                   obs_rms=None, ret_rms=None,
                                   )
 
-        # we only use this to get some info about the environments
-        env = gym.make(self.args.env_name)
-
         # calculate what the maximum length of the trajectories is
-        args.max_trajectory_len = env._max_episode_steps
+        args.max_trajectory_len = self.envs._max_episode_steps
         args.max_trajectory_len *= self.args.max_rollouts_per_task
 
         # calculate number of meta updates
@@ -58,15 +55,12 @@ class MetaLearner:
         else:
             self.args.action_dim = self.envs.action_space.shape[0]
         self.args.obs_dim = self.envs.observation_space.shape[0]
-        self.args.num_states = env.num_states if hasattr(env, 'num_states') else None
+        self.args.num_states = self.envs.num_states if str.startswith(self.args.env_name, 'Grid') else None
         self.args.act_space = self.envs.action_space
 
         self.vae = VaribadVAE(self.args, self.logger, lambda: self.iter_idx)
 
         self.initialise_policy()
-
-        # Cheetah - 20.92176
-        # Walker: -1.91108
 
     def initialise_policy(self):
 
@@ -399,7 +393,8 @@ class MetaLearner:
             if self.vae.state_decoder is not None:
                 torch.save(self.vae.state_decoder, os.path.join(save_path, "state_decoder{0}.pt".format(self.iter_idx)))
             if self.vae.reward_decoder is not None:
-                torch.save(self.vae.reward_decoder, os.path.join(save_path, "reward_decoder{0}.pt".format(self.iter_idx)))
+                torch.save(self.vae.reward_decoder,
+                           os.path.join(save_path, "reward_decoder{0}.pt".format(self.iter_idx)))
             if self.vae.task_decoder is not None:
                 torch.save(self.vae.task_decoder, os.path.join(save_path, "task_decoder{0}.pt".format(self.iter_idx)))
 

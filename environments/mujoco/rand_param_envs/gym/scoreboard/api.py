@@ -132,7 +132,7 @@ def _upload(training_dir, algorithm_id=None, writeup=None, benchmark_run_id=None
         else:
             raise error.Error(
                 "[%s] You didn't have any recorded training data in %s. Once you've used 'env.monitor.start(training_dir)' to start recording, you need to actually run some rollouts. Please join the community chat on https://gym.openai.com if you have any issues." % (
-                env_id, training_dir))
+                    env_id, training_dir))
 
     evaluation = resource.Evaluation.create(
         training_episode_batch=training_episode_batch_id,

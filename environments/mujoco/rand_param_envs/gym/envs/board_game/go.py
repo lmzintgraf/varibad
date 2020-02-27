@@ -262,7 +262,7 @@ class GoEnv(gym.Env):
         white_wins = self.state.board.official_score > 0
         black_wins = self.state.board.official_score < 0
         player_wins = (white_wins and self.player_color == pachi_py.WHITE) or (
-                    black_wins and self.player_color == pachi_py.BLACK)
+                black_wins and self.player_color == pachi_py.BLACK)
         reward = 1. if player_wins else -1. if (white_wins or black_wins) else 0.
         return self.state.board.encode(), reward, True, {'state': self.state}
 

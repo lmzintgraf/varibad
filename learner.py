@@ -11,9 +11,9 @@ import numpy as np
 import torch
 
 from algorithms.a2c import A2C
-from environments.parallel_envs import make_vec_envs
 from algorithms.online_storage import OnlineStorage
 from algorithms.ppo import PPO
+from environments.parallel_envs import make_vec_envs
 from models.policy import Policy
 from utils import evaluation as utl_eval
 from utils import helpers as utl
@@ -26,6 +26,7 @@ class Learner:
     """
     Learner (no meta-learning), can be used to train Oracle policies.
     """
+
     def __init__(self, args):
         self.args = args
 
@@ -43,11 +44,8 @@ class Learner:
                                   obs_rms=None, ret_rms=None,
                                   )
 
-        # we only use this to get some info about the environments
-        env = gym.make(args.env_name)
-
         # calculate what the maximum length of the trajectories is
-        args.max_trajectory_len = env._max_episode_steps
+        args.max_trajectory_len = self.envs._max_episode_steps
         args.max_trajectory_len *= self.args.max_rollouts_per_task
 
         # calculate number of meta updates
@@ -59,7 +57,7 @@ class Learner:
         else:
             self.args.action_dim = self.envs.action_space.shape[0]
         self.args.obs_dim = self.envs.observation_space.shape[0]
-        self.args.num_states = env.num_states if hasattr(env, 'num_states') else None
+        self.args.num_states = self.envs.num_states if str.startswith(self.args.env_name, 'Grid') else None
         self.args.act_space = self.envs.action_space
 
         self.initialise_policy()

@@ -150,7 +150,7 @@ class Car:
             # WHEEL_MOMENT_OF_INERTIA*w.omega * domega/dt = dE/dt = W -- power
             # domega = dt*W/WHEEL_MOMENT_OF_INERTIA/w.omega
             w.omega += dt * ENGINE_POWER * w.gas / WHEEL_MOMENT_OF_INERTIA / (
-                        abs(w.omega) + 5.0)  # small coef not to divide by zero
+                    abs(w.omega) + 5.0)  # small coef not to divide by zero
             self.fuel_spent += dt * ENGINE_POWER * w.gas
 
             if w.brake >= 0.9:

@@ -75,10 +75,10 @@ def update_encoding(encoder, next_obs, action, reward, done, hidden_state):
 
     with torch.no_grad():
         latent_sample, latent_mean, latent_logvar, hidden_state = encoder(actions=action.float(),
-                                                                    states=next_obs,
-                                                                    rewards=reward,
-                                                                    hidden_state=hidden_state,
-                                                                    return_prior=False)
+                                                                          states=next_obs,
+                                                                          rewards=reward,
+                                                                          hidden_state=hidden_state,
+                                                                          return_prior=False)
 
     return latent_sample, latent_mean, latent_logvar, hidden_state
 

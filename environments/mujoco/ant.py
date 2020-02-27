@@ -95,10 +95,8 @@ class AntEnv(MujocoEnv):
             episode_latent_samples = [[] for _ in range(num_episodes)]
             episode_latent_means = [[] for _ in range(num_episodes)]
             episode_latent_logvars = [[] for _ in range(num_episodes)]
-            sample_embeddings = args.sample_embeddings
         else:
             episode_latent_samples = episode_latent_means = episode_latent_logvars = None
-            sample_embeddings = False
 
         # --- roll out policy ---
 
@@ -205,8 +203,6 @@ class AntEnv(MujocoEnv):
 
         for i in range(num_episodes):
             plt.subplot(num_episodes, 1, i + 1)
-            # (not plotting the last step because this gives weird artefacts)
-            # plt.plot(pos[i][:-1], range(len(pos[i][:-1])), 'k')
 
             x = list(map(lambda p: p[0], pos[i]))
             y = list(map(lambda p: p[1], pos[i]))
@@ -223,11 +219,8 @@ class AntEnv(MujocoEnv):
             if i == num_episodes - 1:
                 plt.xlabel('x-position', fontsize=15)
                 plt.ylabel('y-position (ep {})'.format(i), fontsize=15)
-            # else:
-            #     plt.xticks([])
             plt.xlim(min_dim - 0.05 * span, max_dim + 0.05 * span)
             plt.ylim(min_dim - 0.05 * span, max_dim + 0.05 * span)
-            # plt.plot([0, 0], [200, 200], 'b--', alpha=0.2)
 
         plt.tight_layout()
         if image_folder is not None:

@@ -41,7 +41,7 @@ class MultiDiscrete(gym.Space):
 
     def contains(self, x):
         return len(x) == self.num_discrete_space and (np.array(x) >= self.low).all() and (
-                    np.array(x) <= self.high).all()
+                np.array(x) <= self.high).all()
 
     @property
     def shape(self):

@@ -1,7 +1,6 @@
 """
 Taken from https://github.com/openai/baselines
 """
-import warnings
 from multiprocessing import Process, Pipe
 
 import numpy as np
@@ -17,8 +16,6 @@ def worker(remote, parent_remote, env_fn_wrapper):
             cmd, data = remote.recv()
             if cmd == 'step':
                 ob, reward, done, info = env.step(data)
-                # if done:
-                #     ob = env.reset()
                 remote.send((ob, reward, done, info))
             elif cmd == 'reset':
                 ob = env.reset()
@@ -36,12 +33,10 @@ def worker(remote, parent_remote, env_fn_wrapper):
             elif cmd == 'get_task':
                 remote.send(env.unwrapped.get_task())
             elif cmd == 'reset_task':
-                try:
-                    env.unwrapped.reset_task()
-                except AttributeError:
-                    warnings.warn('Tried to reset task but couldnt. If you use GridNavi thats ok.')
+                env.unwrapped.reset_task()
             else:
-                raise NotImplementedError
+                # try to get the attribute directly
+                remote.send(getattr(env.unwrapped, cmd))
     except KeyboardInterrupt:
         print('SubprocVecEnv worker: got KeyboardInterrupt')
     finally:
@@ -54,7 +49,7 @@ class SubprocVecEnv(VecEnv):
     Recommended to use when num_envs > 1 and step() can be a bottleneck.
     """
 
-    def __init__(self, env_fns, spaces=None):
+    def __init__(self, env_fns):
         """
         Arguments:
 
@@ -115,3 +110,7 @@ class SubprocVecEnv(VecEnv):
 
     def _assert_not_closed(self):
         assert not self.closed, "Trying to operate on a SubprocVecEnv after calling close()"
+
+    def get_env_attr(self, attr):
+        self.remotes[0].send((attr, None))
+        return self.remotes[0].recv()

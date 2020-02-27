@@ -1,11 +1,9 @@
 import gym
 import numpy as np
-from gym import Env
 from gym import spaces
 from gym.envs.registration import load
 
 from environments.mujoco import rand_param_envs
-from environments.mujoco.core.serializable import Serializable
 
 
 def mujoco_wrapper(entry_point, **kwargs):
