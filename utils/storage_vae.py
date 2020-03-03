@@ -98,7 +98,7 @@ class RolloutStorageVAE(object):
             if reset_task[i]:
 
                 # add to buffer
-                if self.vae_buffer_add_thresh < np.random.uniform(0, 1):
+                if self.vae_buffer_add_thresh >= np.random.uniform(0, 1):
 
                     # check where to insert data
                     if self.insert_idx + 1 > self.max_buffer_size:
