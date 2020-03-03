@@ -9,5 +9,5 @@ gym==0.16.0
 mujoco-py==2.0.2.9
 
 # for visualisations only
-tensorflow==2.1.0
+tensorflow==1.15
 tensorboardX==1.8

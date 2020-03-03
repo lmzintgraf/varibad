@@ -23,6 +23,7 @@ class VaribadVAE:
         self.args = args
         self.logger = logger
         self.get_iter_idx = get_iter_idx
+        self.task_dim = self.get_task_dim()
 
         # initialise the encoder
         self.encoder = self.initialise_encoder()
@@ -38,7 +39,7 @@ class VaribadVAE:
                                                  obs_dim=self.args.obs_dim,
                                                  action_dim=self.args.action_dim,
                                                  vae_buffer_add_thresh=self.args.vae_buffer_add_thresh,
-                                                 action_embedding_size=self.args.action_embedding_size,
+                                                 task_dim=self.task_dim,
                                                  )
 
         # initalise optimiser for the encoder and decoders
@@ -464,6 +465,19 @@ class VaribadVAE:
         self.log(elbo_loss, rew_reconstruction_loss, state_reconstruction_loss, task_reconstruction_loss, kl_loss)
 
         return elbo_loss
+
+    def get_task_dim(self):
+        if not self.args.decode_task:
+            task_dim = None
+        else:
+            env = gym.make(self.args.env_name)
+            if self.args.task_pred_type == 'task_description':
+                task_dim = env.task_dim
+            elif self.args.task_pred_type == 'task_id':
+                task_dim = env.num_tasks
+            else:
+                raise NotImplementedError
+        return task_dim
 
     def log(self, elbo_loss, rew_reconstruction_loss, state_reconstruction_loss, task_reconstruction_loss, kl_loss):
 
