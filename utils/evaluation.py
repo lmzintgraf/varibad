@@ -412,11 +412,7 @@ def plot_vae_loss(args,
 
         if state_decoder is not None:
             loss_state, state_pred = compute_state_reconstruction_loss(latent_samples, prev_obs, next_obs,
-                                                                       actions, rewards, return_predictions=True)
-            # sum along length of trajectory
-            loss_state = loss_state.sum(dim=1)
-            state_pred = state_pred.sum(dim=1)
-
+                                                                       actions, return_predictions=True)
             # sum along length of trajectory
             loss_state = loss_state.sum(dim=1)
             state_pred = state_pred.sum(dim=1)
