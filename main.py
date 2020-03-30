@@ -14,7 +14,6 @@ from config.gridworld import \
     args_grid_oracle, args_grid_belief_oracle, args_grid_rl2, args_grid_varibad
 from config.mujoco import \
     args_mujoco_cheetah_dir_oracle, args_mujoco_cheetah_dir_rl2, args_mujoco_cheetah_dir_varibad, \
-    args_mujoco_cheetah_vel_oracle, args_mujoco_cheetah_vel_rl2, args_mujoco_cheetah_vel_varibad, \
     args_mujoco_ant_dir_oracle, args_mujoco_ant_dir_rl2, args_mujoco_ant_dir_varibad, \
     args_mujoco_walker_oracle, args_mujoco_walker_rl2, args_mujoco_walker_varibad
 from learner import Learner
