@@ -1,5 +1,6 @@
 import json
 import platform
+import gym
 
 import six.moves.urllib as urlparse
 from six import iteritems

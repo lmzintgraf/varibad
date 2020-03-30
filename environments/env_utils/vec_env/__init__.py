@@ -3,7 +3,7 @@ Taken from https://github.com/openai/baselines
 """
 from abc import ABC, abstractmethod
 
-from utils.common.tile_images import tile_images
+from environments.env_utils.tile_images import tile_images
 
 
 class AlreadySteppingError(Exception):

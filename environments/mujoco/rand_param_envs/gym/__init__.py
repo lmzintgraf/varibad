@@ -52,7 +52,6 @@ from environments.mujoco.rand_param_envs.gym.core import Env, Space, Wrapper, Ob
     RewardWrapper
 from environments.mujoco.rand_param_envs.gym.benchmarks import benchmark_spec
 from environments.mujoco.rand_param_envs.gym.envs import make, spec
-from environments.mujoco.rand_param_envs.gym.scoreboard.api import upload
 from environments.mujoco.rand_param_envs.gym import wrappers
 
-__all__ = ["Env", "Space", "Wrapper", "make", "spec", "upload", "wrappers"]
+__all__ = ["Env", "Space", "Wrapper", "make", "spec", "wrappers"]

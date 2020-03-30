@@ -4,16 +4,15 @@ Based on https://github.com/ikostrikov/pytorch-a2c-ppo-acktr
 import os
 
 import gym
-import numpy as np
 import torch
 
+from environments.env_utils import monitor
+from environments.env_utils.vec_env import VecEnvWrapper
+from environments.env_utils.vec_env.dummy_vec_env import DummyVecEnv
+from environments.env_utils.vec_env.subproc_vec_env import SubprocVecEnv
+from environments.env_utils.vec_env.vec_normalize import VecNormalize
 from environments.wrappers import TimeLimitMask
 from environments.wrappers import VariBadWrapper
-from utils import bench
-from utils.common.vec_env import VecEnvWrapper
-from utils.common.vec_env.dummy_vec_env import DummyVecEnv
-from utils.common.vec_env.subproc_vec_env import SubprocVecEnv
-from utils.common.vec_env.vec_normalize import VecNormalize as VecNormalize_
 
 
 def make_env(env_id, seed, rank, log_dir, allow_early_resets,
@@ -29,8 +28,8 @@ def make_env(env_id, seed, rank, log_dir, allow_early_resets,
         env = VariBadWrapper(env=env, episodes_per_task=episodes_per_task)
 
         if log_dir is not None:
-            env = bench.Monitor(env, os.path.join(log_dir, str(rank)),
-                                allow_early_resets=allow_early_resets)
+            env = monitor.Monitor(env, os.path.join(log_dir, str(rank)),
+                                  allow_early_resets=allow_early_resets)
 
         return env
 
@@ -39,6 +38,7 @@ def make_env(env_id, seed, rank, log_dir, allow_early_resets,
 
 def make_vec_envs(env_name, seed, num_processes, gamma, log_dir,
                   device, allow_early_resets, episodes_per_task,
+                  normalise_obs, normalise_rew,
                   obs_rms, ret_rms, rank_offset=0,
                   **kwargs):
     """
@@ -57,9 +57,11 @@ def make_vec_envs(env_name, seed, num_processes, gamma, log_dir,
 
     if len(envs.observation_space.shape) == 1:
         if gamma is None:
-            envs = VecNormalize(envs, obs_rms=obs_rms, ret_rms=ret_rms, ret=False)
+            envs = VecNormalize(envs, normalise_obs=normalise_obs, normalise_rew=normalise_rew, obs_rms=obs_rms,
+                                ret_rms=ret_rms)
         else:
-            envs = VecNormalize(envs, obs_rms=obs_rms, ret_rms=ret_rms, gamma=gamma)
+            envs = VecNormalize(envs, normalise_obs=normalise_obs, normalise_rew=normalise_rew, obs_rms=obs_rms,
+                                ret_rms=ret_rms, gamma=gamma)
 
     envs = VecPyTorch(envs, device)
 
@@ -115,44 +117,6 @@ class VecPyTorch(VecEnvWrapper):
         if attr in ['num_states', '_max_episode_steps']:
             return self.unwrapped.get_env_attr(attr)
 
-        try:
-            orig_attr = self.__getattribute__(attr)
-        except AttributeError:
-            orig_attr = self.unwrapped.__getattribute__(attr)
-
-        if callable(orig_attr):
-            def hooked(*args, **kwargs):
-                result = orig_attr(*args, **kwargs)
-                return result
-
-            return hooked
-        else:
-            return orig_attr
-
-
-class VecNormalize(VecNormalize_):
-
-    def __init__(self, envs, obs_rms, ret_rms, *args, **kwargs):
-        super(VecNormalize, self).__init__(envs, obs_rms=obs_rms, ret_rms=ret_rms, *args, **kwargs)
-        self.training = True
-
-    def _obfilt(self, obs):
-        if self.training:
-            self.obs_rms.update(obs)
-        obs_norm = np.clip((obs - self.obs_rms.mean) / np.sqrt(self.obs_rms.var + self.epsilon), -self.clipobs,
-                           self.clipobs)
-        return [obs, obs_norm]
-
-    def train(self):
-        self.training = True
-
-    def eval(self):
-        self.training = False
-
-    def __getattr__(self, attr):
-        """
-        If env does not have the attribute then call the attribute in the wrapped_env
-        """
         try:
             orig_attr = self.__getattribute__(attr)
         except AttributeError:

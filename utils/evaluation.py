@@ -39,6 +39,7 @@ def evaluate(args,
                          device=device, allow_early_resets=False,
                          rank_offset=num_processes + 1,  # to use diff tmp folders than main processes
                          episodes_per_task=num_episodes,
+                         normalise_obs=args.norm_obs_for_policy, normalise_rew=args.norm_rew_for_policy,
                          obs_rms=obs_rms, ret_rms=ret_rms)
     num_steps = envs._max_episode_steps
 
@@ -119,6 +120,7 @@ def visualise_behaviour(args,
                         device=device,
                         allow_early_resets=False,
                         episodes_per_task=args.max_rollouts_per_task,
+                        normalise_obs=args.norm_obs_for_policy, normalise_rew=args.norm_rew_for_policy,
                         obs_rms=obs_rms, ret_rms=ret_rms,
                         rank_offset=args.num_processes + 42,  # not sure if the temp folders would otherwise clash
                         )
