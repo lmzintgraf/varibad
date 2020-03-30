@@ -147,6 +147,8 @@ def get_args(rest_args):
                         help='Make code fully deterministic. Expects 1 process and uses deterministic CUDNN')
     parser.add_argument('--num_processes', type=int, default=16,
                         help='how many training CPU processes to use (default: 16)')
+    parser.add_argument('--split_batches_by_task', type=bool, default=False, help='split batches up by task (to save memory)')
+    parser.add_argument('--split_batches_by_elbo', type=bool, default=False, help='split batches up by elbo term (to save memory)')
     args = parser.parse_args(rest_args)
 
     args.cuda = torch.cuda.is_available()

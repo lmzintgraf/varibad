@@ -83,9 +83,7 @@ class RolloutStorageVAE(object):
 
     def insert(self, prev_obs, actions, next_obs, rewards, reset_task, task):
 
-        actions = actions
         for i in range(self.num_processes):
-            actions[i] = actions[i]
             self.running_prev_obs[i].append(prev_obs[i].unsqueeze(0))
             self.running_next_obs[i].append(next_obs[i].unsqueeze(0))
             self.running_rewards[i].append(rewards[i].unsqueeze(0))
@@ -134,6 +132,7 @@ class RolloutStorageVAE(object):
 
                     # add; note: num trajectories are along dim=1,
                     # trajectory length along dim=0, to match pytorch RNN interface
+                    self.prev_obs[:, self.insert_idx] = self.running_prev_obs[i]
                     self.next_obs[:, self.insert_idx] = self.running_next_obs[i]
                     self.actions[:, self.insert_idx] = self.running_actions[i]
                     self.rewards[:, self.insert_idx] = self.running_rewards[i]
@@ -159,8 +158,10 @@ class RolloutStorageVAE(object):
 
     def get_batch(self, num_enc_len=1, num_rollouts=5, include_final=True, replace=False):
 
+        num_rollouts = min(self.buffer_len, num_rollouts)
+
         # select the indices for the processes from which we pick
-        rollout_indices = np.random.choice(range(self.buffer_len), min(self.buffer_len, num_rollouts), replace=replace)
+        rollout_indices = np.random.choice(range(self.buffer_len), num_rollouts, replace=replace)
         # trajectory length of the individual rollouts we picked
         trajectory_lens = np.array(self.trajectory_lens)[rollout_indices]
 

@@ -139,6 +139,8 @@ def get_args(rest_args):
                         help='Make code fully deterministic. Expects 1 process and uses deterministic CUDNN')
     parser.add_argument('--num_processes', type=int, default=16,
                         help='how many training CPU processes to use (default: 16)')
+    parser.add_argument('--split_batches_by_task', type=bool, default=False, help='split batches up by task (to save memory)')
+    parser.add_argument('--split_batches_by_elbo', type=bool, default=False, help='split batches up by elbo term (to save memory)')
     parser.add_argument('--port', type=int, default=8097, help='port to run the server on (default: 8097)')
     args = parser.parse_args(rest_args)
 

@@ -159,13 +159,13 @@ class VaribadVAE:
         # make some predictions and compute individual losses
         if self.args.state_pred_type == 'deterministic':
             obs_reconstruction = self.state_decoder(dec_embedding, dec_prev_obs, dec_actions)
-            loss_state = (obs_reconstruction - dec_next_obs).pow(2).mean(dim=1)
+            loss_state = (obs_reconstruction - dec_next_obs).pow(2).mean(dim=-1)
         elif self.args.state_pred_type == 'gaussian':
             state_pred = self.state_decoder(dec_embedding, dec_prev_obs, dec_actions)
             state_pred_mean = state_pred[:, :state_pred.shape[1] // 2]
             state_pred_std = torch.exp(0.5 * state_pred[:, state_pred.shape[1] // 2:])
             m = torch.distributions.normal.Normal(state_pred_mean, state_pred_std)
-            loss_state = -m.log_prob(dec_next_obs).mean(dim=1)
+            loss_state = -m.log_prob(dec_next_obs).mean(dim=-1)
 
         if return_predictions:
             return loss_state, obs_reconstruction
@@ -176,6 +176,7 @@ class VaribadVAE:
                                         dec_prev_obs, dec_next_obs,
                                         dec_actions, dec_rewards,
                                         return_predictions=False):
+
         """
         Computed the reward reconstruction loss
         (no reduction of loss is done here; sum/avg has to be done outside)
@@ -183,40 +184,19 @@ class VaribadVAE:
 
         # make some predictions and compute individual losses
         if self.args.multihead_for_reward:
-            if self.args.rew_pred_type == 'bernoulli' or self.args.rew_pred_type == 'categorical':
-                # loss for the data we fed into encoder
-                p_rew = self.reward_decoder(dec_embedding, None)
-                env = gym.make(self.args.env_name)
-                indices = env.task_to_id(dec_next_obs).to(device)
-                if indices.dim() < p_rew.dim():
-                    indices = indices.unsqueeze(-1)
-                rew_pred = p_rew.gather(dim=-1, index=indices)
-                rew_target = (dec_rewards == 1).float()
-                loss_rew = F.binary_cross_entropy(rew_pred, rew_target, reduction='none').mean(dim=-1)
-            elif self.args.rew_pred_type == 'deterministic':
-                raise NotImplementedError
-                p_rew = self.reward_decoder(dec_embedding, None)
-                env = gym.make(self.args.env_name)
-                indices = env.task_to_id(dec_next_obs)
-                loss_rew = F.mse_loss(p_rew.gather(1, indices.reshape(-1, 1)), dec_rewards, reduction='none').mean(
-                    dim=1)
-            else:
-                raise NotImplementedError
+            # loss for the data we fed into encoder
+            p_rew = self.reward_decoder(dec_embedding, None)
+            env = gym.make(self.args.env_name)
+            indices = env.task_to_id(dec_next_obs).to(device)
+            if indices.dim() < p_rew.dim():
+                indices = indices.unsqueeze(-1)
+            rew_pred = p_rew.gather(dim=-1, index=indices)
+            rew_target = (dec_rewards == 1).float()
+            # TODO: switch to negative log likelihood!
+            loss_rew = F.binary_cross_entropy(rew_pred, rew_target, reduction='none').mean(dim=-1)
         else:
-            if self.args.rew_pred_type == 'bernoulli':
-                rew_pred = self.reward_decoder(dec_embedding, dec_next_obs)
-                loss_rew = F.binary_cross_entropy(rew_pred, (dec_rewards == 1).float(), reduction='none').mean(dim=1)
-            elif self.args.rew_pred_type == 'deterministic':
-                rew_pred = self.reward_decoder(dec_embedding, dec_next_obs, dec_prev_obs, dec_actions)
-                loss_rew = (rew_pred - dec_rewards).pow(2).mean(dim=1)
-            elif self.args.rew_pred_type == 'gaussian':
-                rew_pred = self.reward_decoder(dec_embedding, dec_next_obs, dec_prev_obs, dec_actions).mean(dim=1)
-                rew_pred_mean = rew_pred[:, :rew_pred.shape[1] // 2]
-                rew_pred_std = torch.exp(0.5 * rew_pred[:, rew_pred.shape[1] // 2:])
-                m = torch.distributions.normal.Normal(rew_pred_mean, rew_pred_std)
-                loss_rew = -m.log_prob(dec_rewards)
-            else:
-                raise NotImplementedError
+            rew_pred = self.reward_decoder(dec_embedding, dec_next_obs, dec_prev_obs, dec_actions.float())
+            loss_rew = (rew_pred - dec_rewards).pow(2).mean(dim=-1)
 
         if return_predictions:
             return loss_rew, rew_pred
@@ -226,20 +206,20 @@ class VaribadVAE:
     def compute_kl_loss(self, latent_mean, latent_logvar, len_encoder):
         # -- KL divergence
         if self.args.kl_to_gauss_prior:
-            kl_divergences = (- 0.5 * (1 + latent_logvar - latent_mean.pow(2) - latent_logvar.exp()).sum(dim=1))
+            kl_divergences = (- 0.5 * (1 + latent_logvar - latent_mean.pow(2) - latent_logvar.exp()).sum(dim=-1))
         else:
             gauss_dim = latent_mean.shape[-1]
             # add the gaussian prior
-            all_means = torch.cat((torch.zeros(1, latent_mean.shape[1]).to(device), latent_mean))
-            all_logvars = torch.cat((torch.zeros(1, latent_logvar.shape[1]).to(device), latent_logvar))
+            all_means = torch.cat((torch.zeros(1, *latent_mean.shape[1:]).to(device), latent_mean))
+            all_logvars = torch.cat((torch.zeros(1, *latent_logvar.shape[1:]).to(device), latent_logvar))
             # https://arxiv.org/pdf/1811.09975.pdf
             # KL(N(mu,E)||N(m,S)) = 0.5 * (log(|S|/|E|) - K + tr(S^-1 E) + (m-mu)^T S^-1 (m-mu)))
             mu = all_means[1:]
             m = all_means[:-1]
             logE = all_logvars[1:]
             logS = all_logvars[:-1]
-            kl_divergences = 0.5 * (torch.sum(logS, dim=1) - torch.sum(logE, dim=1) - gauss_dim + torch.sum(
-                1 / torch.exp(logS) * torch.exp(logE), dim=1) + ((m - mu) / torch.exp(logS) * (m - mu)).sum(dim=1))
+            kl_divergences = 0.5 * (torch.sum(logS, dim=-1) - torch.sum(logE, dim=-1) - gauss_dim + torch.sum(
+                1 / torch.exp(logS) * torch.exp(logE), dim=-1) + ((m - mu) / torch.exp(logS) * (m - mu)).sum(dim=-1))
 
         if self.args.learn_prior:
             mask = torch.ones(len(kl_divergences))
@@ -251,6 +231,368 @@ class VaribadVAE:
             return kl_divergences[len_encoder]
         else:
             return kl_divergences
+
+    def sum_reconstruction_terms(self, losses, idx_traj, len_encoder, trajectory_lens):
+
+        """ Sums the reconstruction errors along episode horizon """
+        if len(np.unique(trajectory_lens)) == 1 and not self.args.decode_only_past:
+            # if for each embedding we decode the entire trajectory, we have a matrix and can sum along dim 1
+            losses = losses.sum(dim=1)
+        else:
+            # otherwise, we loop and sum along the trajectory which we decoded (sum in ELBO_t)
+            start_idx = 0
+            partial_reconstruction_loss = []
+            for i, idx_timestep in enumerate(len_encoder[idx_traj]):
+                if self.args.decode_only_past:
+                    dec_from = 0
+                    dec_until = idx_timestep
+                else:
+                    dec_from = 0
+                    dec_until = trajectory_lens[idx_traj]
+                end_idx = start_idx + (dec_until - dec_from)
+                if end_idx - start_idx != 0:
+                    partial_reconstruction_loss.append(losses[start_idx:end_idx].sum())
+                start_idx = end_idx
+            losses = torch.stack(partial_reconstruction_loss)
+        return losses
+
+    def compute_loss(self, latent_mean, latent_logvar, vae_prev_obs, vae_next_obs, vae_actions,
+                     vae_rewards, vae_tasks, trajectory_lens, len_encoder):
+
+        assert (len(np.unique(trajectory_lens)) == 1) and not self.args.decode_only_past
+
+        # take one sample for each ELBO term
+        if not self.args.disable_stochasticity_in_latent:
+            latent_samples = self.encoder._sample_gaussian(latent_mean, latent_logvar)
+        else:
+            latent_samples = torch.cat((latent_mean, latent_logvar))
+
+        n_elbos = latent_mean.shape[0]  # includes the prior
+        n_horizon = np.unique(trajectory_lens)[0]
+
+        # expand the latent (to match the number of state/rew/action inputs to the decoder)
+        # shape will be: [num tasks in batch] x [num elbos] x [len trajectory (reconstrution loss)] x [dimension]
+        dec_embedding = latent_samples.unsqueeze(0).expand((n_horizon, *latent_samples.shape)).transpose(1, 0)
+
+        # expand the state/rew/action inputs to the decoder (to match size of latents)
+        # shape will be: [num tasks in batch] x [num elbos] x [len trajectory (reconstrution loss)] x [dimension]
+        dec_prev_obs = vae_prev_obs.unsqueeze(0).expand((n_elbos, *vae_prev_obs.shape))
+        dec_next_obs = vae_next_obs.unsqueeze(0).expand((n_elbos, *vae_next_obs.shape))
+        dec_actions = vae_actions.unsqueeze(0).expand((n_elbos, *vae_actions.shape))
+        dec_rewards = vae_rewards.unsqueeze(0).expand((n_elbos, *vae_rewards.shape))
+
+        if self.args.decode_reward:
+            # compute reconstruction loss for this trajectory (for each timestep that was encoded, decode everything and sum it up)
+            # shape: [num_elbo_terms] x [num_reconstruction_terms] x [num_trajectories]
+            rew_reconstruction_loss = self.compute_rew_reconstruction_loss(dec_embedding, dec_prev_obs, dec_next_obs,
+                                                                           dec_actions, dec_rewards)
+            # sum the reconstruction terms per elbo; sum the elbos, average across tasks
+            rew_reconstruction_loss = rew_reconstruction_loss.sum(dim=0).sum(dim=0).mean()
+        else:
+            rew_reconstruction_loss = 0
+
+        if self.args.decode_state:
+            state_reconstruction_loss = self.compute_state_reconstruction_loss(dec_embedding, dec_prev_obs,
+                                                                               dec_next_obs, dec_actions)
+            # sum the reconstruction terms per elbo; sum the elbos, average across tasks
+            state_reconstruction_loss = state_reconstruction_loss.sum(dim=0).sum(dim=-0).mean()
+        else:
+            state_reconstruction_loss = 0
+
+        if self.args.decode_task:
+            task_reconstruction_loss = self.compute_task_reconstruction_loss(latent_samples, vae_tasks)
+            # sum the elbos, average across tasks
+            task_reconstruction_loss = task_reconstruction_loss.sum(dim=0).mean()
+        else:
+            task_reconstruction_loss = 0
+
+        if not self.args.disable_stochasticity_in_latent:
+            # compute the KL term for each ELBO term of the current trajectory
+            kl_loss = self.compute_kl_loss(latent_mean, latent_logvar, None)
+            # sum the elbos, average across tasks
+            kl_loss = kl_loss.sum(dim=0).mean()
+        else:
+            kl_loss = 0
+
+        return rew_reconstruction_loss, state_reconstruction_loss, task_reconstruction_loss, kl_loss
+
+    def compute_loss_split_batches_by_task(self, latent_mean, latent_logvar, vae_prev_obs, vae_next_obs, vae_actions,
+                                           vae_rewards, vae_tasks, trajectory_lens, len_encoder):
+
+        """
+        Loop over tasks to compute losses per task.
+        Saves some memory if batch sizes are very large.
+        """
+
+        rew_reconstruction_loss = []
+        state_reconstruction_loss = []
+        task_reconstruction_loss = []
+        kl_loss = []
+
+        num_tasks = len(trajectory_lens)
+        # for each task we have in our batch...
+        for idx_traj in range(num_tasks):
+
+            # get the embedding values (size: traj_length+1 * latent_dim; the +1 is for the prior)
+            curr_means = latent_mean[:trajectory_lens[idx_traj] + 1, idx_traj, :]
+            curr_logvars = latent_logvar[:trajectory_lens[idx_traj] + 1, idx_traj, :]
+            # take one sample for each elbo term
+            if not self.args.disable_stochasticity_in_latent:
+                curr_samples = self.encoder._sample_gaussian(curr_means, curr_logvars)
+            else:
+                curr_samples = torch.cat((latent_mean, latent_logvar))
+
+            # select data from current rollout (result is traj_length * obs_dim)
+            curr_prev_obs = vae_prev_obs[:, idx_traj, :]
+            curr_next_obs = vae_next_obs[:, idx_traj, :]
+            curr_actions = vae_actions[:, idx_traj, :]
+            curr_rewards = vae_rewards[:, idx_traj, :]
+
+            # if the size of what we decode is always the same, we can speed up creating the batches
+            if len(np.unique(trajectory_lens)) == 1 and not self.args.decode_only_past:
+
+                num_latents = curr_samples.shape[0]  # includes the prior
+                num_decodes = curr_prev_obs.shape[0]
+
+                # expand the latent to match the (x, y) pairs of the decoder
+                dec_embedding = curr_samples.unsqueeze(0).expand((num_decodes, *curr_samples.shape)).transpose(1, 0)
+                dec_embedding_task = curr_samples
+
+                # expand the (x, y) pair of the encoder
+                dec_prev_obs = curr_prev_obs.unsqueeze(0).expand((num_latents, *curr_prev_obs.shape))
+                dec_next_obs = curr_next_obs.unsqueeze(0).expand((num_latents, *curr_next_obs.shape))
+                dec_actions = curr_actions.unsqueeze(0).expand((num_latents, *curr_actions.shape))
+                dec_rewards = curr_rewards.unsqueeze(0).expand((num_latents, *curr_rewards.shape))
+
+            # otherwise, we unfortunately have to loop!
+            # loop through the lengths we are feeding into the encoder for that trajectory (starting with prior)
+            # (these are the different ELBO_t terms)
+            else:
+
+                dec_embedding = []
+                dec_embedding_task = []
+                dec_prev_obs, dec_next_obs, dec_actions, dec_rewards = [], [], [], []
+
+                for i, idx_timestep in enumerate(len_encoder[idx_traj]):
+
+                    # get the index until which we want to decode
+                    # (i.e. either until curr timestep or entire trajectory including future)
+                    if self.args.decode_only_past:
+                        dec_from = 0
+                        dec_until = idx_timestep
+                    else:
+                        dec_from = 0
+                        dec_until = trajectory_lens[idx_traj]
+
+                    if dec_until != 0:
+                        # (1) ... get the latent sample after feeding in some data (determined by len_encoder) & expand (to number of outputs)
+                        # # num latent samples x embedding size
+                        if not self.args.disable_stochasticity_in_latent:
+                            dec_embedding.append(curr_samples[i].expand(dec_until - dec_from, -1))
+                            dec_embedding_task.append(curr_samples[i])
+                        else:
+                            dec_embedding.append(
+                                torch.cat((curr_means[idx_timestep], curr_logvars[idx_timestep])).expand(
+                                    dec_until - dec_from, -1))
+                            dec_embedding_task.append(torch.cat((curr_means[idx_timestep], curr_logvars[idx_timestep])))
+                        # (2) ... get the predictions for the trajectory until the timestep we're interested in
+                        dec_prev_obs.append(curr_prev_obs[dec_from:dec_until])
+                        dec_next_obs.append(curr_next_obs[dec_from:dec_until])
+                        dec_actions.append(curr_actions[dec_from:dec_until])
+                        dec_rewards.append(curr_rewards[dec_from:dec_until])
+
+                # stack all of the things we decode! the dimensions of these will be:
+                # number of elbo terms (current timesteps from which we want to decode (H+1)
+                # x
+                # number of terms in elbo (reconstr. of traj.) (H)
+                # x
+                # dimension (of latent space or obs/act/rew)
+                #
+                # what we want to do is SUM across the length of the predicted trajectory and AVERAGE across the rest
+                if len(np.unique(trajectory_lens)) == 1 and not self.args.decode_only_past:
+                    dec_embedding = torch.stack(dec_embedding)
+                    dec_embedding_task = torch.stack(dec_embedding_task)
+                    #
+                    dec_prev_obs = torch.stack(dec_prev_obs)
+                    dec_next_obs = torch.stack(dec_next_obs)
+                    dec_actions = torch.stack(dec_actions)
+                    dec_rewards = torch.stack(dec_rewards)
+                else:
+                    dec_embedding = torch.cat(dec_embedding)
+                    dec_embedding_task = torch.cat(dec_embedding_task)
+                    #
+                    dec_prev_obs = torch.cat(dec_prev_obs)
+                    dec_next_obs = torch.cat(dec_next_obs)
+                    dec_actions = torch.cat(dec_actions)
+                    dec_rewards = torch.cat(dec_rewards)
+
+            if self.args.decode_reward:
+                # compute reconstruction loss for this trajectory (for each timestep that was encoded, decode everything and sum it up)
+                # size: if all trajectories are of same length [num_elbo_terms x num_reconstruction_terms], otherwise it's flattened into one
+                rrc = self.compute_rew_reconstruction_loss(dec_embedding, dec_prev_obs, dec_next_obs, dec_actions,
+                                                           dec_rewards)
+                rrc = self.sum_reconstruction_terms(rrc, idx_traj, len_encoder, trajectory_lens)
+                rew_reconstruction_loss.append(rrc)
+
+            if self.args.decode_state:
+                src = self.compute_state_reconstruction_loss(dec_embedding, dec_prev_obs, dec_next_obs, dec_actions)
+                src = self.sum_reconstruction_terms(src, idx_traj, len_encoder, trajectory_lens)
+                state_reconstruction_loss.append(src)
+
+            if self.args.decode_task:
+                trc = self.compute_task_reconstruction_loss(dec_embedding_task, vae_tasks[idx_traj])
+                task_reconstruction_loss.append(trc)
+
+            if not self.args.disable_stochasticity_in_latent:
+                # compute the KL term for each ELBO term of the current trajectory
+                kl = self.compute_kl_loss(curr_means, curr_logvars, len_encoder[idx_traj])
+                kl_loss.append(kl)
+
+        # sum the ELBO_t terms
+        if self.args.decode_reward:
+            rew_reconstruction_loss = torch.stack(rew_reconstruction_loss)
+            rew_reconstruction_loss = rew_reconstruction_loss.sum(dim=1)
+        else:
+            rew_reconstruction_loss = 0
+
+        if self.args.decode_state:
+            state_reconstruction_loss = torch.stack(state_reconstruction_loss)
+            state_reconstruction_loss = state_reconstruction_loss.sum(dim=1)
+        else:
+            state_reconstruction_loss = 0
+
+        if self.args.decode_task:
+            task_reconstruction_loss = torch.stack(task_reconstruction_loss)
+            task_reconstruction_loss = task_reconstruction_loss.sum(dim=1)
+        else:
+            task_reconstruction_loss = 0
+
+        if not self.args.disable_stochasticity_in_latent:
+            kl_loss = torch.stack(kl_loss)
+            kl_loss = kl_loss.sum(dim=1)
+        else:
+            kl_loss = 0
+
+        return rew_reconstruction_loss, state_reconstruction_loss, task_reconstruction_loss, kl_loss
+
+    def compute_loss_split_batches_by_elbo(self, latent_mean, latent_logvar, vae_prev_obs, vae_next_obs, vae_actions,
+                                           vae_rewards, vae_tasks, trajectory_lens):
+
+        """
+        Loop over the elvo_t terms to compute losses per t.
+        Saves some memory if batch sizes are very large,
+        or if trajectory lengths are different, or if we decode only the past.
+        """
+
+        rew_reconstruction_loss = []
+        state_reconstruction_loss = []
+        task_reconstruction_loss = []
+
+        assert len(np.unique(trajectory_lens)) == 1
+        n_horizon = np.unique(trajectory_lens)[0]
+        n_elbos = latent_mean.shape[0]  # includes the prior
+
+        # for each elbo term (including one for the prior)...
+        for idx_elbo in range(n_elbos):
+
+            # get the embedding values (size: traj_length+1 * latent_dim; the +1 is for the prior)
+            curr_means = latent_mean[idx_elbo]
+            curr_logvars = latent_logvar[idx_elbo]
+
+            # take one sample for each task
+            if not self.args.disable_stochasticity_in_latent:
+                curr_samples = self.encoder._sample_gaussian(curr_means, curr_logvars)
+            else:
+                curr_samples = torch.cat((latent_mean, latent_logvar))
+
+            # if the size of what we decode is always the same, we can speed up creating the batches
+            if not self.args.decode_only_past:
+
+                # expand the latent to match the (x, y) pairs of the decoder
+                dec_embedding = curr_samples.unsqueeze(0).expand((n_horizon, *curr_samples.shape))
+                dec_embedding_task = curr_samples
+
+                dec_prev_obs = vae_prev_obs
+                dec_next_obs = vae_next_obs
+                dec_actions = vae_actions
+                dec_rewards = vae_rewards
+
+            # otherwise, we unfortunately have to loop!
+            # loop through the lengths we are feeding into the encoder for that trajectory (starting with prior)
+            # (these are the different ELBO_t terms)
+            else:
+
+                # get the index until which we want to decode
+                # (i.e. eithe runtil curr timestep or entire trajectory including future)
+                if self.args.decode_only_past:
+                    dec_from = 0
+                    dec_until = idx_elbo
+                else:
+                    dec_from = 0
+                    dec_until = n_horizon
+
+                if dec_from == dec_until:
+                    continue
+
+                # (1) ... get the latent sample after feeding in some data (determined by len_encoder) & expand (to number of outputs)
+                # num latent samples x embedding size
+                dec_embedding = curr_samples.unsqueeze(0).expand(dec_until - dec_from, *curr_samples.shape)
+                dec_embedding_task = curr_samples
+                # (2) ... get the predictions for the trajectory until the timestep we're interested in
+                dec_prev_obs = vae_prev_obs[dec_from:dec_until]
+                dec_next_obs = vae_next_obs[dec_from:dec_until]
+                dec_actions = vae_actions[dec_from:dec_until]
+                dec_rewards = vae_rewards[dec_from:dec_until]
+
+            if self.args.decode_reward:
+                # compute reconstruction loss for this trajectory (for each timestep that was encoded, decode everything and sum it up)
+                # size: if all trajectories are of same length [num_elbo_terms x num_reconstruction_terms], otherwise it's flattened into one
+                rrc = self.compute_rew_reconstruction_loss(dec_embedding, dec_prev_obs, dec_next_obs, dec_actions,
+                                                           dec_rewards)
+                # sum up the reconstruction terms; average over tasks
+                rrc = rrc.sum(dim=0).mean()
+                rew_reconstruction_loss.append(rrc)
+
+            if self.args.decode_state:
+                src = self.compute_state_reconstruction_loss(dec_embedding, dec_prev_obs, dec_next_obs, dec_actions)
+                # sum up the reconstruction terms; average over tasks
+                src = src.sum(dim=0).mean()
+                state_reconstruction_loss.append(src)
+
+            if self.args.decode_task:
+                trc = self.compute_task_reconstruction_loss(dec_embedding_task, vae_tasks)
+                # average across tasks
+                trc = trc.mean()
+                task_reconstruction_loss.append(trc)
+
+        # sum the ELBO_t terms
+        if self.args.decode_reward:
+            rew_reconstruction_loss = torch.stack(rew_reconstruction_loss)
+            rew_reconstruction_loss = rew_reconstruction_loss.sum()
+        else:
+            rew_reconstruction_loss = 0
+
+        if self.args.decode_state:
+            state_reconstruction_loss = torch.stack(state_reconstruction_loss)
+            state_reconstruction_loss = state_reconstruction_loss.sum()
+        else:
+            state_reconstruction_loss = 0
+
+        if self.args.decode_task:
+            task_reconstruction_loss = torch.stack(task_reconstruction_loss)
+            task_reconstruction_loss = task_reconstruction_loss.sum()
+        else:
+            task_reconstruction_loss = 0
+
+        if not self.args.disable_stochasticity_in_latent:
+            # compute the KL term for each ELBO term of the current trajectory
+            kl_loss = self.compute_kl_loss(latent_mean, latent_logvar, None)
+            # sum the elbos, average across tasks
+            kl_loss = kl_loss.sum(dim=0).mean()
+        else:
+            kl_loss = 0
+
+        return rew_reconstruction_loss, state_reconstruction_loss, task_reconstruction_loss, kl_loss
 
     def compute_vae_loss(self, update=False):
         """
@@ -277,162 +619,18 @@ class VaribadVAE:
                                                         hidden_state=None,
                                                         return_prior=True)
 
-        rew_reconstruction_loss = []
-        state_reconstruction_loss = []
-        task_reconstruction_loss = []
-        kl_loss = []
-
-        num_tasks = len(trajectory_lens)
-        # for each task we have in our batch...
-        for idx_traj in range(num_tasks):
-
-            # get the embedding values (size: traj_length+1 * latent_dim; the +1 is for the prior)
-            curr_means = latent_mean[:trajectory_lens[idx_traj] + 1, idx_traj, :]
-            curr_logvars = latent_logvar[:trajectory_lens[idx_traj] + 1, idx_traj, :]
-            # take one sample for each ELBO term
-            curr_samples = self.encoder._sample_gaussian(curr_means, curr_logvars)
-
-            # select data from current rollout (result is traj_length * obs_dim)
-            curr_prev_obs = vae_prev_obs[:, idx_traj, :]
-            curr_next_obs = vae_next_obs[:, idx_traj, :]
-            curr_actions = vae_actions[:, idx_traj, :]
-            curr_rewards = vae_rewards[:, idx_traj, :]
-
-            dec_embedding = []
-            dec_embedding_task = []
-            dec_prev_obs, dec_next_obs, dec_actions, dec_rewards = [], [], [], []
-
-            # if the size of what we decode is always the same, we can speed up creating the batches
-            if len(np.unique(trajectory_lens)) == 1 and not self.args.decode_only_past:
-
-                num_latents = curr_samples.shape[0]  # includes the prior
-                num_decodes = curr_prev_obs.shape[0]
-
-                # expand the latent to match the (x, y) pairs of the decoder
-                dec_embedding = curr_samples.unsqueeze(0).expand((num_decodes, *curr_samples.shape)).transpose(1, 0)
-                dec_embedding_task = curr_samples
-
-                # expand the (x, y) pair of the encoder
-                dec_prev_obs = curr_prev_obs.unsqueeze(0).expand((num_latents, *curr_prev_obs.shape))
-                dec_next_obs = curr_next_obs.unsqueeze(0).expand((num_latents, *curr_next_obs.shape))
-                dec_actions = curr_actions.unsqueeze(0).expand((num_latents, *curr_actions.shape))
-                dec_rewards = curr_rewards.unsqueeze(0).expand((num_latents, *curr_rewards.shape))
-
-            # otherwise, we unfortunately have to loop!
-            # loop through the lengths we are feeding into the encoder for that trajectory (starting with prior)
-            # (these are the different ELBO_t terms)
-            else:
-
-                for i, idx_timestep in enumerate(len_encoder[idx_traj]):
-
-                    # get samples
-
-                    # get the index until which we want to decode
-                    # (i.e. eithe runtil curr timestep or entire trajectory including future)
-                    if self.args.decode_only_past:
-                        dec_until = idx_timestep
-                    else:
-                        dec_until = trajectory_lens[idx_traj]
-
-                    if dec_until != 0:
-                        # (1) ... get the latent sample after feeding in some data (determined by len_encoder) & expand (to number of outputs)
-                        # # num latent samples x embedding size
-                        if not self.args.disable_stochasticity_in_latent:
-                            dec_embedding.append(curr_samples[i].expand(dec_until, -1))
-                            dec_embedding_task.append(curr_samples[i])
-                        else:
-                            dec_embedding.append(
-                                torch.cat((curr_means[idx_timestep], curr_logvars[idx_timestep])).expand(dec_until, -1))
-                            dec_embedding_task.append(torch.cat((curr_means[idx_timestep], curr_logvars[idx_timestep])))
-                        # (2) ... get the predictions for the trajectory until the timestep we're interested in
-                        dec_prev_obs.append(curr_prev_obs[:dec_until])
-                        dec_next_obs.append(curr_next_obs[:dec_until])
-                        dec_actions.append(curr_actions[:dec_until])
-                        dec_rewards.append(curr_rewards[:dec_until])
-
-                # stack all of the things we decode! the dimensions of these will be:
-                # number of elbo terms (current timesteps from which we want to decode (H+1)
-                # x
-                # number of terms in elbo (reconstr. of traj.) (H)
-                # x
-                # dimension (of latent space or obs/act/rew)
-                #
-                # what we want to do is SUM across the length of the predicted trajectory and AVERAGE across the rest
-                if self.args.decode_only_past:
-                    dec_embedding = torch.cat(dec_embedding)
-                    dec_embedding_task = torch.cat(dec_embedding_task)
-                    #
-                    dec_prev_obs = torch.cat(dec_prev_obs)
-                    dec_next_obs = torch.cat(dec_next_obs)
-                    dec_actions = torch.cat(dec_actions)
-                    dec_rewards = torch.cat(dec_rewards)
-                else:
-                    dec_embedding = torch.stack(dec_embedding)
-                    dec_embedding_task = torch.stack(dec_embedding_task)
-                    #
-                    dec_prev_obs = torch.stack(dec_prev_obs)
-                    dec_next_obs = torch.stack(dec_next_obs)
-                    dec_actions = torch.stack(dec_actions)
-                    dec_rewards = torch.stack(dec_rewards)
-
-            if self.args.decode_reward:
-                # compute reconstruction loss for this trajectory
-                # (for each timestep that was encoded, decode everything and sum it up)
-                rrc = self.compute_rew_reconstruction_loss(dec_embedding,
-                                                           dec_prev_obs,
-                                                           dec_next_obs,
-                                                           dec_actions,
-                                                           dec_rewards
-                                                           )
-                # sum along the trajectory which we decoded (sum in ELBO_t)
-                if self.args.decode_only_past:
-                    curr_idx = 0
-                    past_reconstr_sum = []
-                    for i, idx_timestep in enumerate(len_encoder[idx_traj]):
-                        dec_until = idx_timestep
-                        if dec_until != 0:
-                            past_reconstr_sum.append(rrc[curr_idx:curr_idx + dec_until].sum())
-                        curr_idx += dec_until
-                    rrc = torch.stack(past_reconstr_sum)
-                else:
-                    rrc = rrc.sum(dim=1)
-                rew_reconstruction_loss.append(rrc)
-            if self.args.decode_state:
-                src = self.compute_state_reconstruction_loss(dec_embedding, dec_prev_obs, dec_next_obs, dec_actions)
-                src = src.sum(dim=1)
-                state_reconstruction_loss.append(src)
-            if self.args.decode_task:
-                trc = self.compute_task_reconstruction_loss(dec_embedding_task, vae_tasks[idx_traj])
-                task_reconstruction_loss.append(trc)
-            if not self.args.disable_stochasticity_in_latent:
-                # compute the KL term for each ELBO term of the current trajectory
-                kl = self.compute_kl_loss(curr_means, curr_logvars, len_encoder[idx_traj])
-                kl_loss.append(kl)
-
-        # sum the ELBO_t terms per task
-        if self.args.decode_reward:
-            rew_reconstruction_loss = torch.stack(rew_reconstruction_loss)
-            rew_reconstruction_loss = rew_reconstruction_loss.sum(dim=1)
+        if self.args.split_batches_by_task:
+            losses = self.compute_loss_split_batches_by_task(latent_mean, latent_logvar, vae_prev_obs, vae_next_obs,
+                                                             vae_actions, vae_rewards, vae_tasks,
+                                                             trajectory_lens, len_encoder)
+        elif self.args.split_batches_by_elbo:
+            losses = self.compute_loss_split_batches_by_elbo(latent_mean, latent_logvar, vae_prev_obs, vae_next_obs,
+                                                             vae_actions, vae_rewards, vae_tasks,
+                                                             trajectory_lens, len_encoder)
         else:
-            rew_reconstruction_loss = 0
-
-        if self.args.decode_state:
-            state_reconstruction_loss = torch.stack(state_reconstruction_loss)
-            state_reconstruction_loss = state_reconstruction_loss.sum(dim=1)
-        else:
-            state_reconstruction_loss = 0
-
-        if self.args.decode_task:
-            task_reconstruction_loss = torch.stack(task_reconstruction_loss)
-            task_reconstruction_loss = task_reconstruction_loss.sum(dim=1)
-        else:
-            task_reconstruction_loss = 0
-
-        if not self.args.disable_stochasticity_in_latent:
-            kl_loss = torch.stack(kl_loss)
-            kl_loss = kl_loss.sum(dim=1)
-        else:
-            kl_loss = 0
+            losses = self.compute_loss(latent_mean, latent_logvar, vae_prev_obs, vae_next_obs, vae_actions,
+                                       vae_rewards, vae_tasks, trajectory_lens, len_encoder)
+        rew_reconstruction_loss, state_reconstruction_loss, task_reconstruction_loss, kl_loss = losses
 
         # VAE loss = KL loss + reward reconstruction + state transition reconstruction
         # take average (this is the expectation over p(M))
