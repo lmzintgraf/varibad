@@ -11,8 +11,7 @@ from environments.env_utils.vec_env import VecEnvWrapper
 from environments.env_utils.vec_env.dummy_vec_env import DummyVecEnv
 from environments.env_utils.vec_env.subproc_vec_env import SubprocVecEnv
 from environments.env_utils.vec_env.vec_normalize import VecNormalize
-from environments.wrappers import TimeLimitMask
-from environments.wrappers import VariBadWrapper
+from environments.wrappers import TimeLimitMask, VariBadWrapper
 
 
 def make_env(env_id, seed, rank, log_dir, allow_early_resets,
