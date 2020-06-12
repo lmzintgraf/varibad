@@ -73,21 +73,20 @@ def main():
     elif env == 'mujoco_walker_varibad':
         args = args_mujoco_walker_varibad.get_args(rest_args)
 
-    # make sure we have log directories for mujoco
-    if 'mujoco' in env:
-        try:
-            os.makedirs(args.agent_log_dir)
-        except OSError:
-            files = glob.glob(os.path.join(args.agent_log_dir, '*.monitor.csv'))
-            for f in files:
-                os.remove(f)
-        eval_log_dir = args.agent_log_dir + "_eval"
-        try:
-            os.makedirs(eval_log_dir)
-        except OSError:
-            files = glob.glob(os.path.join(eval_log_dir, '*.monitor.csv'))
-            for f in files:
-                os.remove(f)
+    # log directories TODO: check if really necessary to have monitor wrap?
+    try:
+        os.makedirs(args.agent_log_dir)
+    except OSError:
+        files = glob.glob(os.path.join(args.agent_log_dir, '*.monitor.csv'))
+        for f in files:
+            os.remove(f)
+    eval_log_dir = args.agent_log_dir + "_eval"
+    try:
+        os.makedirs(eval_log_dir)
+    except OSError:
+        files = glob.glob(os.path.join(eval_log_dir, '*.monitor.csv'))
+        for f in files:
+            os.remove(f)
 
     # warning
     if args.deterministic_execution:
