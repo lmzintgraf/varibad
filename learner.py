@@ -207,13 +207,9 @@ class Learner:
                 done_indices = np.argwhere(done.flatten()).flatten()
                 if len(done_indices) == self.args.num_processes:
                     [next_obs_raw, next_obs_normalised] = self.envs.reset()
-                    if not self.args.sample_embeddings:
-                        latent_sample = latent_sample
                 else:
                     for i in done_indices:
                         [next_obs_raw[i], next_obs_normalised[i]] = self.envs.reset(index=i)
-                        if not self.args.sample_embeddings:
-                            latent_sample[i] = latent_sample[i]
 
                 # add experience to policy buffer
                 self.policy_storage.insert(

@@ -63,7 +63,7 @@ def get_augmented_obs(args, obs,
     elif (latent_mean is not None) and (latent_logvar is not None):
         latent_mean = latent_mean.reshape((-1, latent_mean.shape[-1]))
         latent_logvar = latent_logvar.reshape((-1, latent_logvar.shape[-1]))
-        obs_augmented = torch.cat((obs_augmented, latent_mean, latent_logvar), dim=1)
+        obs_augmented = torch.cat((obs_augmented, latent_mean, latent_logvar), dim=-1)
 
     return obs_augmented
 
