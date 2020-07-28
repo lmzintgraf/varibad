@@ -249,15 +249,6 @@ class MetaLearner:
 
             # --- UPDATE ---
 
-            train_stats = self.update(
-                obs=prev_obs_normalised if self.args.norm_obs_for_policy else prev_obs_raw,
-                latent_sample=latent_sample, latent_mean=latent_mean, latent_logvar=latent_logvar)
-
-            # log
-            run_stats = [action, action_log_prob, value]
-            if train_stats is not None:
-                self.log(run_stats, train_stats, start_time)
-
             if self.args.precollect_len <= self.frames:
                 # check if we are pre-training the VAE
                 if self.args.pretrain_len > 0 and not vae_is_pretrained:

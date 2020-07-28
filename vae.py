@@ -157,7 +157,7 @@ class VaribadVAE:
 
             rew_pred = self.reward_decoder(latent, None)
             if self.args.rew_pred_type == 'categorical':
-                rew_pred = F.softmax(rew_pred)
+                rew_pred = F.softmax(rew_pred, dim=-1)
             elif self.args.rew_pred_type == 'bernoulli':
                 rew_pred = F.sigmoid(rew_pred)
 
