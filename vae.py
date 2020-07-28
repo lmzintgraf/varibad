@@ -198,8 +198,9 @@ class VaribadVAE:
             env = gym.make(self.args.env_name)
             task_target = env.task_to_id(task).to(device)
             # expand along first axis (number of ELBO terms)
-            task_target = task_target.expand(task_pred.shape[:-1])
-            loss_task = F.cross_entropy(task_pred, task_target, reduction='none')
+            task_target = task_target.expand(task_pred.shape[:-1]).reshape(-1)
+            loss_task = F.cross_entropy(task_pred.view(-1, task_pred.shape[-1]),
+                                        task_target, reduction='none').view(task_pred.shape[:-1])
         elif self.args.task_pred_type == 'task_description':
             loss_task = (task_pred - task).pow(2).mean(dim=-1)
         else:

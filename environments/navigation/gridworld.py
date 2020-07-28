@@ -595,7 +595,7 @@ def plot_belief(env, beliefs, args):
     if args.rew_pred_type == 'categorical':
         beliefs = F.softmax(beliefs, dim=-1)
     elif args.rew_pred_type == 'bernoulli':
-        beliefs = F.sigmoid(beliefs)
+        beliefs = torch.sigmoid(beliefs)
 
     # draw probabilities for each grid cell
     alphas = []
