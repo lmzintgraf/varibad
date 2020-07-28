@@ -123,6 +123,7 @@ def get_args(rest_args):
 
     # --- ABLATIONS ---
 
+    parser.add_argument('--add_nonlinearity_to_latent', type=boolean_argument, default=False)
     parser.add_argument('--disable_decoder', type=boolean_argument, default=False)
     parser.add_argument('--disable_stochasticity_in_latent', type=boolean_argument, default=False)
     parser.add_argument('--sample_embeddings', type=boolean_argument, default=False,

@@ -8,6 +8,7 @@ from distutils.util import strtobool
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.nn import functional as F
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -59,6 +60,10 @@ def get_augmented_obs(args, obs,
 
     if not args.condition_policy_on_state:
         obs_augmented = torch.zeros(0, ).to(device)
+
+    if args.add_nonlinearity_to_latent:
+        latent_mean = F.relu(latent_mean)
+        latent_logvar = F.relu(latent_logvar)
 
     if sample_embeddings and (latent_sample is not None):
         obs_augmented = torch.cat((obs_augmented, latent_sample), dim=1)
