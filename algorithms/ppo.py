@@ -11,6 +11,8 @@ class PPO:
                  actor_critic,
                  value_loss_coef,
                  entropy_coef,
+                 policy_anneal_lr,
+                 train_steps,
                  optimiser_vae=None,
                  lr=None,
                  clip_param=0.2,
@@ -35,6 +37,12 @@ class PPO:
 
         self.optimiser = optim.Adam(actor_critic.parameters(), lr=lr, eps=eps)
         self.optimiser_vae = optimiser_vae
+
+        if policy_anneal_lr:
+            lam = lambda f: 1-f/train_steps
+            self.lr_scheduler = optim.lr_scheduler.LambdaLR(self.optimiser, lr_lambda=lam)
+        else:
+            self.lr_scheduler = None
 
     def update(self,
                args,
@@ -148,6 +156,9 @@ class PPO:
         action_loss_epoch /= num_updates
         dist_entropy_epoch /= num_updates
         loss_epoch /= num_updates
+
+        if self.lr_scheduler:
+            self.lr_scheduler.step()
 
         return value_loss_epoch, action_loss_epoch, dist_entropy_epoch, loss_epoch
 

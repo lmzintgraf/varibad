@@ -98,14 +98,18 @@ def main():
                                'Warning: This will slow things down and might break A2C if '
                                'policy_num_steps < env._max_episode_steps.')
 
-    # start training
-    if args.disable_varibad:
-        # When the flag `disable_varibad` is activated, the file `learner.py` will be used instead of `metalearner.py`.
-        # This is a stripped down version without encoder, decoder, stochastic latent variables, etc.
-        learner = Learner(args)
-    else:
-        learner = MetaLearner(args)
-    learner.train()
+    all_seeds = args.seed
+    for seed in all_seeds:
+        args.seed = seed
+
+        # start training
+        if args.disable_varibad:
+            # When the flag `disable_varibad` is activated, the file `learner.py` will be used instead of `metalearner.py`.
+            # This is a stripped down version without encoder, decoder, stochastic latent variables, etc.
+            learner = Learner(args)
+        else:
+            learner = MetaLearner(args)
+        learner.train()
 
 
 if __name__ == '__main__':

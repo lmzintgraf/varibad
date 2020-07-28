@@ -31,9 +31,19 @@ def get_args(rest_args):
     parser.add_argument('--policy_layers', nargs='+', default=[32, 32])
     parser.add_argument('--policy_activation_function', type=str, default='tanh', help='tanh/relu/leaky-relu')
     parser.add_argument('--policy_initialisation', type=str, default='normc', help='normc/orthogonal')
+    parser.add_argument('--policy_anneal_lr', type=boolean_argument, default=False)
 
     # algo
     parser.add_argument('--policy', type=str, default='a2c', help='choose: a2c, ppo, optimal, oracle')
+
+    # ppo specific
+    parser.add_argument('--ppo_num_epochs', type=int, default=2, help='number of epochs per PPO update')
+    parser.add_argument('--ppo_num_minibatch', type=int, default=4, help='number of minibatches to split the data')
+    parser.add_argument('--ppo_use_huberloss', type=boolean_argument, default=True,
+                        help='use huber loss instead of MSE')
+    parser.add_argument('--ppo_use_clipped_value_loss', type=boolean_argument, default=True,
+                        help='clip the value loss in ppo')
+    parser.add_argument('--ppo_clip_param', type=float, default=0.05, help='clamp param')
 
     # a2c specific
     parser.add_argument('--a2c_alpha', type=float, default=0.99, help='RMSprop optimizer alpha (default: 0.99)')
@@ -142,7 +152,7 @@ def get_args(rest_args):
     parser.add_argument('--results_log_dir', default=None, help='directory to save agent logs (default: ./data)')
 
     # general settings
-    parser.add_argument('--seed', type=int, default=73, help='random seed (default: 73)')
+    parser.add_argument('--seed',  nargs='+', type=int, default=[73])
     parser.add_argument('--deterministic_execution', type=boolean_argument, default=False,
                         help='Make code fully deterministic. Expects 1 process and uses deterministic CUDNN')
     parser.add_argument('--num_processes', type=int, default=16,

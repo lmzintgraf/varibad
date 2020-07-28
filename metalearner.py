@@ -115,6 +115,8 @@ class MetaLearner:
                 policy_net,
                 self.args.policy_value_loss_coef,
                 self.args.policy_entropy_coef,
+                policy_anneal_lr=self.args.policy_anneal_lr,
+                train_steps=self.args.num_updates,
                 optimiser_vae=self.vae.optimiser_vae,
                 lr=self.args.lr_policy,
                 eps=self.args.policy_eps,
