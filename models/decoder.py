@@ -120,6 +120,7 @@ class TaskDecoder(nn.Module):
                  latent_dim,
                  pred_type,
                  task_dim,
+                 num_tasks,
                  ):
         super(TaskDecoder, self).__init__()
 
@@ -132,7 +133,8 @@ class TaskDecoder(nn.Module):
             self.fc_layers.append(nn.Linear(curr_input_dim, layers[i]))
             curr_input_dim = layers[i]
 
-        self.fc_out = nn.Linear(curr_input_dim, task_dim)
+        output_dim = task_dim if pred_type == 'task_description' else num_tasks
+        self.fc_out = nn.Linear(curr_input_dim, output_dim)
 
     def forward(self, latent_state):
 

@@ -181,7 +181,10 @@ class GridNavi(gym.Env):
             elif action == 5 and self.enable_goal_hint:
                 state[-2:] = self._goal.copy()
 
-        return state, reward, done, {'task': self.get_task()}
+        task = self.get_task()
+        task_id = self.task_to_id(task)
+        info = {'task': task, 'task_id': task_id}
+        return state, reward, done, info
 
     def task_to_id(self, goals):
         mat = torch.arange(0, self.num_cells ** 2).long().reshape((self.num_cells, self.num_cells))

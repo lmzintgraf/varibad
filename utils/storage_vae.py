@@ -6,7 +6,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class RolloutStorageVAE(object):
     def __init__(self, num_processes, max_trajectory_len, zero_pad, max_num_rollouts,
-                 obs_dim, action_dim, vae_buffer_add_thresh, task_dim=1, rew_dim=1):
+                 obs_dim, action_dim, vae_buffer_add_thresh, task_dim):
         """
         Store everything that is needed for the VAE update
         :param num_processes:
@@ -14,7 +14,6 @@ class RolloutStorageVAE(object):
 
         self.obs_dim = obs_dim
         self.action_dim = action_dim
-        self.rew_dim = rew_dim
         self.task_dim = task_dim
 
         self.vae_buffer_add_thresh = vae_buffer_add_thresh  # prob of adding new trajectories
@@ -33,7 +32,7 @@ class RolloutStorageVAE(object):
         self.actions = torch.zeros((self.max_traj_len, self.max_buffer_size, action_dim))
         self.rewards = torch.zeros((self.max_traj_len, self.max_buffer_size, 1))
         if task_dim is not None:
-            self.tasks = torch.zeros((self.max_traj_len, self.max_buffer_size, task_dim))
+            self.tasks = torch.zeros((self.max_buffer_size, task_dim))
         else:
             self.tasks = None
         self.trajectory_lens = [0] * self.max_buffer_size
@@ -43,10 +42,12 @@ class RolloutStorageVAE(object):
         self.curr_timestep = torch.zeros((num_processes)).long()  # count environment steps so we know where to insert
         self.running_prev_obs = torch.zeros((self.max_traj_len, num_processes, obs_dim)).to(device)  # for each episode will have obs 0...N-1
         self.running_next_obs = torch.zeros((self.max_traj_len, num_processes, obs_dim)).to(device)  # for each episode will have obs 1...N
-        self.running_rewards = torch.zeros((self.max_traj_len, num_processes, rew_dim)).to(device)
+        self.running_rewards = torch.zeros((self.max_traj_len, num_processes, 1)).to(device)
         self.running_actions = torch.zeros((self.max_traj_len, num_processes, action_dim)).to(device)
         if self.tasks is not None:
-            self.running_tasks = torch.zeros((self.max_traj_len, num_processes)).to(device)
+            self.running_tasks = torch.zeros((num_processes, task_dim)).to(device)
+        else:
+            self.running_tasks = None
 
     def get_running_batch(self):
         """

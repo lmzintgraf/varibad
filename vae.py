@@ -6,7 +6,7 @@ from torch.nn import functional as F
 from models.decoder import StateTransitionDecoder, RewardDecoder, TaskDecoder
 from models.encoder import RNNEncoder
 from utils.storage_vae import RolloutStorageVAE
-from utils.helpers import get_task_dim
+from utils.helpers import get_task_dim, get_num_tasks
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -24,6 +24,7 @@ class VaribadVAE:
         self.logger = logger
         self.get_iter_idx = get_iter_idx
         self.task_dim = get_task_dim(self.args)
+        self.num_tasks = get_num_tasks(self.args)
 
         # initialise the encoder
         self.encoder = self.initialise_encoder()
@@ -119,6 +120,7 @@ class VaribadVAE:
                 latent_dim=latent_dim,
                 layers=self.args.task_decoder_layers,
                 task_dim=self.task_dim,
+                num_tasks=self.num_tasks,
                 pred_type=self.args.task_pred_type,
             ).to(device)
         else:
@@ -190,9 +192,10 @@ class VaribadVAE:
 
         if self.args.task_pred_type == 'task_id':
             env = gym.make(self.args.env_name)
-            task = env.task_to_id(task)
-            task = task.expand(task_pred.shape[:-1]).view(-1)
-            loss_task = F.cross_entropy(task_pred.unsqueeze(0), task, reduction='none').reshape(task_pred.shape[:-1])
+            task_target = env.task_to_id(task).to(device)
+            # expand along first axis (number of ELBO terms)
+            task_target = task_target.expand(task_pred.shape[:-1])
+            loss_task = F.cross_entropy(task_pred, task_target, reduction='none')
         elif self.args.task_pred_type == 'task_description':
             loss_task = (task_pred - task).pow(2).mean(dim=-1)
         else:
@@ -257,7 +260,7 @@ class VaribadVAE:
         return losses
 
     def compute_loss(self, latent_mean, latent_logvar, vae_prev_obs, vae_next_obs, vae_actions,
-                     vae_rewards, vae_tasks, trajectory_lens, len_encoder):
+                     vae_rewards, vae_tasks, trajectory_lens):
 
         assert (len(np.unique(trajectory_lens)) == 1) and not self.args.decode_only_past
 
@@ -265,7 +268,7 @@ class VaribadVAE:
         if not self.args.disable_stochasticity_in_latent:
             latent_samples = self.encoder._sample_gaussian(latent_mean, latent_logvar)
         else:
-            latent_samples = torch.cat((latent_mean, latent_logvar))
+            latent_samples = torch.cat((latent_mean, latent_logvar), dim=-1)
 
         n_elbos = latent_mean.shape[0]  # includes the prior
         n_horizon = np.unique(trajectory_lens)[0]
@@ -626,10 +629,10 @@ class VaribadVAE:
         elif self.args.split_batches_by_elbo:
             losses = self.compute_loss_split_batches_by_elbo(latent_mean, latent_logvar, vae_prev_obs, vae_next_obs,
                                                              vae_actions, vae_rewards, vae_tasks,
-                                                             trajectory_lens, len_encoder)
+                                                             trajectory_lens)
         else:
             losses = self.compute_loss(latent_mean, latent_logvar, vae_prev_obs, vae_next_obs, vae_actions,
-                                       vae_rewards, vae_tasks, trajectory_lens, len_encoder)
+                                       vae_rewards, vae_tasks, trajectory_lens)
         rew_reconstruction_loss, state_reconstruction_loss, task_reconstruction_loss, kl_loss = losses
 
         # VAE loss = KL loss + reward reconstruction + state transition reconstruction

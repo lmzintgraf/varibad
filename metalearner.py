@@ -187,8 +187,7 @@ class MetaLearner:
                 # create mask for episode ends
                 masks_done = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done]).to(device)
                 # bad_mask is true if episode ended because time limit was reached
-                bad_masks = torch.FloatTensor(
-                    [[0.0] if 'bad_transition' in info.keys() else [1.0] for info in infos]).to(device)
+                bad_masks = torch.FloatTensor([[0.0] if 'bad_transition' in info.keys() else [1.0] for info in infos]).to(device)
 
                 # compute next embedding (for next loop and/or value prediction bootstrap)
                 latent_sample, latent_mean, latent_logvar, hidden_state = utl.update_encoding(encoder=self.vae.encoder,
