@@ -551,8 +551,13 @@ def compute_beliefs(env, args, reward_decoder, latent_mean, latent_logvar, goal)
 
     # compute reward predictions for those
     if reward_decoder.multi_head:
-        rew_pred_means = torch.mean(reward_decoder(samples, None), dim=0)  # .reshape((1, -1))
-        rew_pred_vars = torch.var(reward_decoder(samples, None), dim=0)  # .reshape((1, -1))
+        rew_pred = reward_decoder(samples, None)
+        if args.rew_pred_type == 'bernoulli':
+            rew_pred = torch.sigmoid(rew_pred)
+        elif args.rew_pred_type == 'categorical':
+            rew_pred = torch.softmax(rew_pred, 1)
+        rew_pred_means = torch.mean(rew_pred, dim=0)  # .reshape((1, -1))
+        rew_pred_vars = torch.var(rew_pred, dim=0)  # .reshape((1, -1))
     else:
         tsm = []
         tsv = []
@@ -563,8 +568,11 @@ def compute_beliefs(env, args, reward_decoder, latent_mean, latent_logvar, goal)
                 if isinstance(goal, np.ndarray):
                     goal = torch.from_numpy(goal)
                 curr_state = torch.cat((curr_state, goal.repeat(curr_state.shape[0], 1).float()), dim=1)
-            tsm.append(torch.mean(reward_decoder(samples, curr_state)))
-            tsv.append(torch.var(reward_decoder(samples, curr_state)))
+            rew_pred = reward_decoder(samples, curr_state)
+            if args.rew_pred_type == 'bernoulli':
+                rew_pred = torch.sigmoid(rew_pred)
+            tsm.append(torch.mean(rew_pred))
+            tsv.append(torch.var(rew_pred))
         rew_pred_means = torch.stack(tsm).reshape((1, -1))
         rew_pred_vars = torch.stack(tsv).reshape((1, -1))
     # rew_pred_means = rew_pred_means[-1][0]

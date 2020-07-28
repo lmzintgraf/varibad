@@ -6,24 +6,24 @@ from torch.nn import functional as F
 from models.decoder import StateTransitionDecoder, RewardDecoder, TaskDecoder
 from models.encoder import RNNEncoder
 from utils.storage_vae import RolloutStorageVAE
+from utils.helpers import get_task_dim
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class VaribadVAE:
     """
-    VAE of variBAD:
-    - has an encoder and decoder,
+    VAE of VariBAD:
+    - has an encoder and decoder
     - can compute the ELBO loss
-    - can update the VAE part of the model
+    - can update the VAE (encoder+decoder)
     """
-
     def __init__(self, args, logger, get_iter_idx):
 
         self.args = args
         self.logger = logger
         self.get_iter_idx = get_iter_idx
-        self.task_dim = self.get_task_dim()
+        self.task_dim = get_task_dim(self.args)
 
         # initialise the encoder
         self.encoder = self.initialise_encoder()
@@ -32,6 +32,7 @@ class VaribadVAE:
         self.state_decoder, self.reward_decoder, self.task_decoder = self.initialise_decoder()
 
         # initialise rollout storage for the VAE update
+        # (this differs from the data that the on-policy RL algorithm uses)
         self.rollout_storage = RolloutStorageVAE(num_processes=self.args.num_processes,
                                                  max_trajectory_len=self.args.max_trajectory_len,
                                                  zero_pad=True,
@@ -43,7 +44,6 @@ class VaribadVAE:
                                                  )
 
         # initalise optimiser for the encoder and decoders
-
         decoder_params = []
         if not self.args.disable_decoder:
             if self.args.decode_reward:
@@ -52,41 +52,54 @@ class VaribadVAE:
                 decoder_params.extend(self.state_decoder.parameters())
             if self.args.decode_task:
                 decoder_params.extend(self.task_decoder.parameters())
-
         self.optimiser_vae = torch.optim.Adam([*self.encoder.parameters(), *decoder_params], lr=self.args.lr_vae)
 
-    def compute_task_reconstruction_loss(self, dec_embedding, dec_task, return_predictions=False):
-        # make some predictions and compute individual losses
-        task_pred = self.task_decoder(dec_embedding)
-
-        if self.args.task_pred_type == 'task_id':
-            env = gym.make(self.args.env_name)
-            dec_task = env.task_to_id(dec_task)
-            dec_task = dec_task.expand(task_pred.shape[:-1]).view(-1)
-            # loss for the data we fed into encoder
-            task_pred_shape = task_pred.shape
-            loss_task = F.cross_entropy(task_pred.view(-1, task_pred.shape[-1]), dec_task, reduction='none').reshape(
-                task_pred_shape[:-1])
-        elif self.args.task_pred_type == 'task_description':
-            loss_task = (task_pred - dec_task).pow(2).mean(dim=1)
-
-        if return_predictions:
-            return loss_task, task_pred
-        else:
-            return loss_task
+    def initialise_encoder(self):
+        """ Initialises and returns an RNN encoder """
+        encoder = RNNEncoder(
+            layers_before_gru=self.args.layers_before_aggregator,
+            hidden_size=self.args.aggregator_hidden_size,
+            layers_after_gru=self.args.layers_after_aggregator,
+            latent_dim=self.args.latent_dim,
+            action_dim=self.args.action_dim,
+            action_embed_dim=self.args.action_embedding_size,
+            state_dim=self.args.obs_dim,
+            state_embed_dim=self.args.state_embedding_size,
+            reward_size=1,
+            reward_embed_size=self.args.reward_embedding_size,
+        ).to(device)
+        return encoder
 
     def initialise_decoder(self):
+        """ Initialises and returns the (state/reward/task) decoder as specified in self.args """
+
+        if self.args.disable_decoder:
+            return None, None, None
 
         latent_dim = self.args.latent_dim
+        # double latent dimension (input size to decoder) if we use a deterministic latents (for easier comparison)
         if self.args.disable_stochasticity_in_latent:
             latent_dim *= 2
 
+        # initialise state decoder for VAE
+        if self.args.decode_state:
+            state_decoder = StateTransitionDecoder(
+                layers=self.args.state_decoder_layers,
+                latent_dim=latent_dim,
+                action_dim=self.args.action_dim,
+                action_embed_dim=self.args.action_embedding_size,
+                state_dim=self.args.obs_dim,
+                state_embed_dim=self.args.state_embedding_size,
+                pred_type=self.args.state_pred_type,
+            ).to(device)
+        else:
+            state_decoder = None
+
+        # initialise reward decoder for VAE
         if self.args.decode_reward:
-            # initialise reward decoder for VAE
             reward_decoder = RewardDecoder(
                 layers=self.args.reward_decoder_layers,
                 latent_dim=latent_dim,
-                #
                 state_dim=self.args.obs_dim,
                 state_embed_dim=self.args.state_embedding_size,
                 action_dim=self.args.action_dim,
@@ -100,32 +113,12 @@ class VaribadVAE:
         else:
             reward_decoder = None
 
-        if self.args.decode_state:
-            # initialise state decoder for VAE
-            state_decoder = StateTransitionDecoder(
-                latent_dim=latent_dim,
-                layers=self.args.state_decoder_layers,
-                action_dim=self.args.action_dim,
-                action_embed_dim=self.args.action_embedding_size,
-                state_dim=self.args.obs_dim,
-                state_embed_dim=self.args.state_embedding_size,
-                pred_type=self.args.state_pred_type,
-            ).to(device)
-        else:
-            state_decoder = None
-
+        # initialise task decoder for VAE
         if self.args.decode_task:
-            env = gym.make(self.args.env_name)
-            if self.args.task_pred_type == 'task_description':
-                task_dim = env.task_dim
-            elif self.args.task_pred_type == 'task_id':
-                task_dim = env.num_tasks
-            else:
-                raise NotImplementedError
             task_decoder = TaskDecoder(
                 latent_dim=latent_dim,
                 layers=self.args.task_decoder_layers,
-                task_dim=task_dim,
+                task_dim=self.task_dim,
                 pred_type=self.args.task_pred_type,
             ).to(device)
         else:
@@ -133,75 +126,82 @@ class VaribadVAE:
 
         return state_decoder, reward_decoder, task_decoder
 
-    def initialise_encoder(self):
-        """
-        Initialises an RNN encoder.
-        :return:
-        """
+    def compute_state_reconstruction_loss(self, latent, prev_obs, next_obs, action, return_predictions=False):
+        """ Compute state reconstruction loss.
+        (No reduction of loss along batch dimension is done here; sum/avg has to be done outside) """
 
-        encoder = RNNEncoder(
-            layers_before_gru=self.args.layers_before_aggregator,
-            hidden_size=self.args.aggregator_hidden_size,
-            layers_after_gru=self.args.layers_after_aggregator,
-            latent_dim=self.args.latent_dim,
-            action_dim=self.args.action_dim,
-            action_embed_dim=self.args.action_embedding_size,
-            state_dim=self.args.obs_dim,
-            state_embed_dim=self.args.state_embedding_size,
-            reward_size=1,
-            reward_embed_size=self.args.reward_embedding_size,
-        ).to(device)
+        state_pred = self.state_decoder(latent, prev_obs, action)
 
-        return encoder
-
-    def compute_state_reconstruction_loss(self, dec_embedding, dec_prev_obs, dec_next_obs, dec_actions,
-                                          return_predictions=False):
-        # make some predictions and compute individual losses
         if self.args.state_pred_type == 'deterministic':
-            obs_reconstruction = self.state_decoder(dec_embedding, dec_prev_obs, dec_actions)
-            loss_state = (obs_reconstruction - dec_next_obs).pow(2).mean(dim=-1)
-        elif self.args.state_pred_type == 'gaussian':
-            state_pred = self.state_decoder(dec_embedding, dec_prev_obs, dec_actions)
+            loss_state = (state_pred - next_obs).pow(2).mean(dim=-1)
+        elif self.args.state_pred_type == 'gaussian':  # TODO: untested!
             state_pred_mean = state_pred[:, :state_pred.shape[1] // 2]
             state_pred_std = torch.exp(0.5 * state_pred[:, state_pred.shape[1] // 2:])
             m = torch.distributions.normal.Normal(state_pred_mean, state_pred_std)
-            loss_state = -m.log_prob(dec_next_obs).mean(dim=-1)
+            loss_state = -m.log_prob(next_obs).mean(dim=-1)
+        else:
+            raise NotImplementedError
 
         if return_predictions:
-            return loss_state, obs_reconstruction
+            return loss_state, state_pred
         else:
             return loss_state
 
-    def compute_rew_reconstruction_loss(self, dec_embedding,
-                                        dec_prev_obs, dec_next_obs,
-                                        dec_actions, dec_rewards,
-                                        return_predictions=False):
+    def compute_rew_reconstruction_loss(self, latent, prev_obs, next_obs, action, reward, return_predictions=False):
+        """ Compute reward reconstruction loss.
+        (No reduction of loss along batch dimension is done here; sum/avg has to be done outside) """
 
-        """
-        Computed the reward reconstruction loss
-        (no reduction of loss is done here; sum/avg has to be done outside)
-        """
-
-        # make some predictions and compute individual losses
         if self.args.multihead_for_reward:
-            # loss for the data we fed into encoder
-            p_rew = self.reward_decoder(dec_embedding, None)
+            p_rew = self.reward_decoder(latent, None)
             env = gym.make(self.args.env_name)
-            indices = env.task_to_id(dec_next_obs).to(device)
+            indices = env.task_to_id(next_obs).to(device)
             if indices.dim() < p_rew.dim():
                 indices = indices.unsqueeze(-1)
             rew_pred = p_rew.gather(dim=-1, index=indices)
-            rew_target = (dec_rewards == 1).float()
-            # TODO: switch to negative log likelihood!
-            loss_rew = F.binary_cross_entropy(rew_pred, rew_target, reduction='none').mean(dim=-1)
+            rew_target = (reward == 1).float()
+            if self.args.rew_pred_type == 'bernoulli':
+                loss_rew = F.binary_cross_entropy_with_logits(rew_pred, rew_target, reduction='none').mean(dim=-1)
+            elif self.args.rew_pred_type == 'categorical':
+                loss_rew = F.cross_entropy(rew_pred, rew_target, reduction='none').mean(dim=-1)
+            elif self.args.rew_pred_type == 'deterministic':  # TODO: untested!
+                loss_rew = (rew_pred - reward).pow(2).mean(dim=-1)
+            else:
+                raise NotImplementedError
         else:
-            rew_pred = self.reward_decoder(dec_embedding, dec_next_obs, dec_prev_obs, dec_actions.float())
-            loss_rew = (rew_pred - dec_rewards).pow(2).mean(dim=-1)
+            rew_pred = self.reward_decoder(latent, next_obs, prev_obs, action.float())
+            rew_target = (rew_pred == 1).float()
+            if self.args.rew_pred_type == 'bernoulli':
+                loss_rew = F.binary_cross_entropy(rew_pred, rew_target, reduction='none').mean(dim=-1)
+            elif self.args.rew_pred_type == 'deterministic':
+                loss_rew = (rew_pred - reward).pow(2).mean(dim=-1)
+            else:
+                raise NotImplementedError
 
         if return_predictions:
             return loss_rew, rew_pred
         else:
             return loss_rew
+
+    def compute_task_reconstruction_loss(self, latent, task, return_predictions=False):
+        """ Compute task reconstruction loss.
+        (No reduction of loss along batch dimension is done here; sum/avg has to be done outside) """
+
+        task_pred = self.task_decoder(latent)
+
+        if self.args.task_pred_type == 'task_id':
+            env = gym.make(self.args.env_name)
+            task = env.task_to_id(task)
+            task = task.expand(task_pred.shape[:-1]).view(-1)
+            loss_task = F.cross_entropy(task_pred.unsqueeze(0), task, reduction='none').reshape(task_pred.shape[:-1])
+        elif self.args.task_pred_type == 'task_description':
+            loss_task = (task_pred - task).pow(2).mean(dim=-1)
+        else:
+            raise NotImplementedError
+
+        if return_predictions:
+            return loss_task, task_pred
+        else:
+            return loss_task
 
     def compute_kl_loss(self, latent_mean, latent_logvar, len_encoder):
         # -- KL divergence
@@ -663,19 +663,6 @@ class VaribadVAE:
         self.log(elbo_loss, rew_reconstruction_loss, state_reconstruction_loss, task_reconstruction_loss, kl_loss)
 
         return elbo_loss
-
-    def get_task_dim(self):
-        if not self.args.decode_task:
-            task_dim = None
-        else:
-            env = gym.make(self.args.env_name)
-            if self.args.task_pred_type == 'task_description':
-                task_dim = env.task_dim
-            elif self.args.task_pred_type == 'task_id':
-                task_dim = env.num_tasks
-            else:
-                raise NotImplementedError
-        return task_dim
 
     def log(self, elbo_loss, rew_reconstruction_loss, state_reconstruction_loss, task_reconstruction_loss, kl_loss):
 

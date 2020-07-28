@@ -1,4 +1,5 @@
 import os
+import gym
 import pickle
 import random
 import warnings
@@ -237,6 +238,21 @@ def update_mean_var_count_from_moments(mean, var, count, batch_mean, batch_var, 
 
     return new_mean, new_var, new_count
 
+
 def boolean_argument(value):
     """Convert a string value to boolean."""
     return bool(strtobool(value))
+
+
+def get_task_dim(args):
+    if not args.decode_task:
+        task_dim = None
+    else:
+        env = gym.make(args.env_name)
+        if args.task_pred_type == 'task_description':
+            task_dim = env.task_dim
+        elif args.task_pred_type == 'task_id':
+            task_dim = env.num_tasks
+        else:
+            raise NotImplementedError
+    return task_dim

@@ -84,24 +84,31 @@ def get_args(rest_args):
 
     # - decoder: rewards
     parser.add_argument('--decode_reward', type=boolean_argument, default=True, help='use reward decoder')
+    parser.add_argument('--rew_loss_coeff', type=float, default=1.0, help='weight for state loss (vs reward loss)')
     parser.add_argument('--input_prev_state', type=boolean_argument, default=False, help='use prev state for rew pred')
     parser.add_argument('--input_action', type=boolean_argument, default=False, help='use prev action for rew pred')
     parser.add_argument('--reward_decoder_layers', nargs='+', type=int, default=[32, 32])
-    parser.add_argument('--rew_pred_type', type=str, default='bernoulli',
-                        help='choose from: bernoulli, gaussian, deterministic')
     parser.add_argument('--multihead_for_reward', type=boolean_argument, default=True,
                         help='one head per reward pred (i.e. per state)')
-    parser.add_argument('--rew_loss_coeff', type=float, default=1.0, help='weight for state loss (vs reward loss)')
+    parser.add_argument('--rew_pred_type', type=str, default='bernoulli',
+                        help='choose: '
+                             'bernoulli (predict p(r=1|s))'
+                             'categorical (treat as classification problem, r=1 for *one* state)'
+                             'deterministic (treat as regression problem)')
 
     # - decoder: state transitions
     parser.add_argument('--decode_state', type=boolean_argument, default=False, help='use state decoder')
-    parser.add_argument('--state_loss_coeff', type=float, default=1.0, help='weight for state loss (vs reward loss)')
+    parser.add_argument('--state_loss_coeff', type=float, default=1.0, help='weight for state loss')
+    parser.add_argument('--state_decoder_layers', nargs='+', type=int, default=[32, 32])
+    parser.add_argument('--state_pred_type', type=str, default='deterministic',
+                        help='choose from: deterministic, gaussian')
 
     # - decoder: ground-truth task ("varibad oracle", after Humplik et al. 2019)
     parser.add_argument('--decode_task', type=boolean_argument, default=False, help='use task decoder')
-    parser.add_argument('--task_loss_coeff', type=float, default=1.0, help='weight for task loss (vs other losses)')
+    parser.add_argument('--task_loss_coeff', type=float, default=1.0, help='weight for task loss')
     parser.add_argument('--task_decoder_layers', nargs='+', type=int, default=[32, 32])
-    parser.add_argument('--task_pred_type', type=str, default='task_id', help='choose from: task_id, task_description')
+    parser.add_argument('--task_pred_type', type=str, default='task_id',
+                        help='choose from: task_id, task_description')
 
     # --- ABLATIONS ---
 
