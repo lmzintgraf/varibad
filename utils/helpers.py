@@ -66,7 +66,8 @@ def get_augmented_obs(args, obs,
         latent_logvar = F.relu(latent_logvar)
 
     if sample_embeddings and (latent_sample is not None):
-        obs_augmented = torch.cat((obs_augmented, latent_sample), dim=1)
+        latent_sample = latent_sample.reshape((-1, latent_sample.shape[-1]))
+        obs_augmented = torch.cat((obs_augmented, latent_sample), dim=-1)
     elif (latent_mean is not None) and (latent_logvar is not None):
         latent_mean = latent_mean.reshape((-1, latent_mean.shape[-1]))
         latent_logvar = latent_logvar.reshape((-1, latent_logvar.shape[-1]))
