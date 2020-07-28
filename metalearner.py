@@ -93,6 +93,7 @@ class MetaLearner:
             init_std=self.args.policy_init_std,
             hidden_layers=self.args.policy_layers,
             activation_function=self.args.policy_activation_function,
+            policy_initialisation=self.args.policy_initialisation,
             normalise_actions=self.args.normalise_actions,
             action_low=action_low,
             action_high=action_high,

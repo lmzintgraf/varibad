@@ -29,7 +29,8 @@ def get_args(rest_args):
 
     # network
     parser.add_argument('--policy_layers', nargs='+', default=[32, 32])
-    parser.add_argument('--policy_activation_function', type=str, default='tanh')
+    parser.add_argument('--policy_activation_function', type=str, default='tanh', help='tanh/relu/leaky-relu')
+    parser.add_argument('--policy_initialisation', type=str, default='normc', help='normc/orthogonal')
 
     # algo
     parser.add_argument('--policy', type=str, default='a2c', help='choose: a2c, ppo, optimal, oracle')

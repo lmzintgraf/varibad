@@ -20,6 +20,7 @@ class Policy(nn.Module):
                  action_low,
                  action_high,
                  normalise_actions,
+                 policy_initialisation='orthogonal',
                  min_std=1e-6,
                  use_task_encoder=False,
                  state_embed_dim=None,
@@ -53,7 +54,6 @@ class Policy(nn.Module):
             raise ValueError
 
         # initialise task encoder (for the oracle)
-
         self.use_task_encoder = use_task_encoder
         self.task_dim = task_dim
         self.latent_dim = latent_dim
@@ -64,8 +64,10 @@ class Policy(nn.Module):
             curr_input_dim = state_embed_dim + latent_dim
 
         # initialise actor and critic
-
-        init_ = lambda m: init(m, init_normc_, lambda x: nn.init.constant_(x, 0))
+        if policy_initialisation == 'normc':
+            init_ = lambda m: init(m, init_normc_, lambda x: nn.init.constant_(x, 0), nn.init.calculate_gain(activation_function))
+        elif policy_initialisation == 'orthogonal':
+            init_ = lambda m: init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), nn.init.calculate_gain(activation_function))
 
         self.actor_layers = nn.ModuleList()
         self.critic_layers = nn.ModuleList()
