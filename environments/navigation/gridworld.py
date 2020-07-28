@@ -4,10 +4,11 @@ import random
 
 import gym
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 import numpy as np
 import torch
 from gym import spaces
-from matplotlib.patches import Rectangle
+from torch.nn import functional as F
 
 from utils import helpers as utl
 
@@ -484,10 +485,10 @@ def plot_bb(env, args, episode_all_obs, episode_goals, reward_decoder,
                                          curr_goal)
                 rew_pred_means[episode_idx].append(rm)
                 rew_pred_vars[episode_idx].append(rv)
-                plot_belief(env, rm)
+                plot_belief(env, rm, args)
             elif episode_beliefs is not None:
                 curr_beliefs = torch.tensor(episode_beliefs[episode_idx][step_idx])
-                plot_belief(env, curr_beliefs)
+                plot_belief(env, curr_beliefs, args)
             else:
                 rew_pred_means = rew_pred_vars = None
 
@@ -583,7 +584,7 @@ def compute_beliefs(env, args, reward_decoder, latent_mean, latent_logvar, goal)
     return rew_pred_means, rew_pred_vars
 
 
-def plot_belief(env, beliefs):
+def plot_belief(env, beliefs, args):
     """
     Plot the belief by taking 100 samples from the latent space and plotting the average predicted reward per cell.
     """
@@ -591,8 +592,10 @@ def plot_belief(env, beliefs):
     num_cells = int(env.observation_space.high[0] + 1)
     unwrapped_env = env.venv.unwrapped.envs[0]
 
-    if not hasattr(unwrapped_env, 'task_to_id'):
-        return
+    if args.rew_pred_type == 'categorical':
+        beliefs = F.softmax(beliefs, dim=-1)
+    elif args.rew_pred_type == 'bernoulli':
+        beliefs = F.sigmoid(beliefs)
 
     # draw probabilities for each grid cell
     alphas = []
@@ -604,6 +607,9 @@ def plot_belief(env, beliefs):
             alpha = beliefs[idx]
             alphas.append(alpha.item())
     alphas = np.array(alphas)
+    # cut off values (this only happens if we don't use sigmoid/softmax)
+    alphas[alphas < 0] = 0
+    alphas[alphas > 1] = 1
     # alphas = (np.array(alphas)-min(alphas)) / (max(alphas) - min(alphas))
     count = 0
     for i in range(num_cells):
