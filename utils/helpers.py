@@ -2,6 +2,7 @@ import os
 import pickle
 import random
 import warnings
+from distutils.util import strtobool
 
 import numpy as np
 import torch
@@ -235,3 +236,7 @@ def update_mean_var_count_from_moments(mean, var, count, batch_mean, batch_var, 
     new_count = tot_count
 
     return new_mean, new_var, new_count
+
+def boolean_argument(value):
+    """Convert a string value to boolean."""
+    return bool(strtobool(value))

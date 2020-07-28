@@ -2,7 +2,7 @@ import argparse
 
 import torch
 
-from utils.cli import boolean_argument
+from utils.helpers import boolean_argument
 
 
 def get_args(rest_args):
