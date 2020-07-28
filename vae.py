@@ -159,7 +159,7 @@ class VaribadVAE:
             if self.args.rew_pred_type == 'categorical':
                 rew_pred = F.softmax(rew_pred, dim=-1)
             elif self.args.rew_pred_type == 'bernoulli':
-                rew_pred = F.sigmoid(rew_pred)
+                rew_pred = torch.sigmoid(rew_pred)
 
             env = gym.make(self.args.env_name)
             state_indices = env.task_to_id(next_obs).to(device)
