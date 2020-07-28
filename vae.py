@@ -154,19 +154,23 @@ class VaribadVAE:
         (No reduction of loss along batch dimension is done here; sum/avg has to be done outside) """
 
         if self.args.multihead_for_reward:
-            p_rew = self.reward_decoder(latent, None)
+
+            rew_pred = self.reward_decoder(latent, None)
+            if self.args.rew_pred_type == 'categorical':
+                rew_pred = F.softmax(rew_pred)
+            elif self.args.rew_pred_type == 'bernoulli':
+                rew_pred = F.sigmoid(rew_pred)
+
             env = gym.make(self.args.env_name)
-            indices = env.task_to_id(next_obs).to(device)
-            if indices.dim() < p_rew.dim():
-                indices = indices.unsqueeze(-1)
-            rew_pred = p_rew.gather(dim=-1, index=indices)
+            state_indices = env.task_to_id(next_obs).to(device)
+            if state_indices.dim() < rew_pred.dim():
+                state_indices = state_indices.unsqueeze(-1)
+            rew_pred = rew_pred.gather(dim=-1, index=state_indices)
             rew_target = (reward == 1).float()
-            if self.args.rew_pred_type == 'bernoulli':
-                loss_rew = F.binary_cross_entropy_with_logits(rew_pred, rew_target, reduction='none').mean(dim=-1)
-            elif self.args.rew_pred_type == 'categorical':
-                loss_rew = F.cross_entropy(rew_pred, rew_target, reduction='none').mean(dim=-1)
-            elif self.args.rew_pred_type == 'deterministic':  # TODO: untested!
+            if self.args.rew_pred_type == 'deterministic':  # TODO: untested!
                 loss_rew = (rew_pred - reward).pow(2).mean(dim=-1)
+            elif self.args.rew_pred_type in ['categorical', 'bernoulli']:
+                loss_rew = F.binary_cross_entropy(rew_pred, rew_target, reduction='none').mean(dim=-1)
             else:
                 raise NotImplementedError
         else:

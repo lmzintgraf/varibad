@@ -104,7 +104,7 @@ def get_args(rest_args):
     parser.add_argument('--rew_pred_type', type=str, default='bernoulli',
                         help='choose: '
                              'bernoulli (predict p(r=1|s))'
-                             'categorical (treat as classification problem, r=1 for *one* state)'
+                             'categorical (predict p(r=1|s) but use softmax instead of sigmoid)'
                              'deterministic (treat as regression problem)')
 
     # - decoder: state transitions
@@ -162,6 +162,14 @@ def get_args(rest_args):
     parser.add_argument('--split_batches_by_elbo', type=bool, default=False, help='split batches up by elbo term (to save memory)')
     parser.add_argument('--port', type=int, default=8097, help='port to run the server on (default: 8097)')
     args = parser.parse_args(rest_args)
+
+    if args.disable_decoder:
+        args.decode_reward = False
+        args.decode_state = False
+        args.decode_task = False
+    
+    if args.decode_only_past:
+        args.split_batches_by_elbo = True
 
     args.cuda = torch.cuda.is_available()
 
