@@ -96,7 +96,7 @@ class PPO:
 
                 # Reshape to do in a single forward pass for all steps
                 values, action_log_probs, dist_entropy, action_mean, action_logstd = \
-                    self.actor_critic.evaluate_actions(obs_aug, actions_batch, return_action_mean=True)
+                    self.actor_critic.evaluate_actions(obs_aug, actions_batch, return_action_mean=True, update_rms=(e==0))
 
                 ratio = torch.exp(action_log_probs -
                                   old_action_log_probs_batch)

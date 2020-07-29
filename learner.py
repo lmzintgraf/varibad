@@ -109,7 +109,7 @@ class Learner:
         # initialise policy network
         policy_net = Policy(
             # general
-            state_dim=int(self.args.condition_policy_on_state) * state_dim,
+            obs_dim=int(self.args.condition_policy_on_state) * state_dim,
             action_space=self.envs.action_space,
             init_std=self.args.policy_init_std,
             hidden_layers=self.args.policy_layers,

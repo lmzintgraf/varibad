@@ -87,7 +87,8 @@ class MetaLearner:
             action_low = action_high = None
 
         policy_net = Policy(
-            state_dim=input_dim,
+            args=self.args,
+            obs_dim=input_dim,
             action_space=self.args.act_space,
             init_std=self.args.policy_init_std,
             hidden_layers=self.args.policy_layers,

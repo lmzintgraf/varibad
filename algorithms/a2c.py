@@ -77,7 +77,7 @@ class A2C:
                                             )
 
             values, action_log_probs, dist_entropy, action_mean, action_logstd = \
-                self.actor_critic.evaluate_actions(obs_aug, actions_batch, return_action_mean=True)
+                self.actor_critic.evaluate_actions(obs_aug, actions_batch, return_action_mean=True, update_rms=True)
 
             # --  UPDATE --
 

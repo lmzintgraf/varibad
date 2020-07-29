@@ -12,7 +12,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class Policy(nn.Module):
     def __init__(self,
-                 state_dim,
+                 args,
+                 obs_dim,
                  action_space,
                  init_std,
                  hidden_layers,
@@ -29,8 +30,12 @@ class Policy(nn.Module):
                  ):
         super(Policy, self).__init__()
 
+        self.args = args
+        if (not self.args.disable_metalearner) and self.args.norm_latents_for_policy:
+            self.state_rms = utl.RunningMeanStd(shape=(obs_dim))
+
         hidden_layers = [int(h) for h in hidden_layers]
-        curr_input_dim = state_dim
+        curr_input_dim = obs_dim
 
         # output distributions of the policy
         if action_space.__class__.__name__ == "Discrete":
@@ -59,7 +64,7 @@ class Policy(nn.Module):
         self.latent_dim = latent_dim
         if self.use_task_encoder:
             self.task_encoder = utl.FeatureExtractor(self.task_dim, self.latent_dim, self.activation_function)
-            self.state_encoder = utl.FeatureExtractor(state_dim - self.task_dim, state_embed_dim,
+            self.state_encoder = utl.FeatureExtractor(obs_dim - self.task_dim, state_embed_dim,
                                                       self.activation_function)
             curr_input_dim = state_embed_dim + latent_dim
 
@@ -103,6 +108,9 @@ class Policy(nn.Module):
 
     def forward(self, inputs):
 
+        if (not self.args.disable_metalearner) and self.args.norm_latents_for_policy:
+            inputs = (inputs - self.state_rms.mean) / torch.sqrt(self.state_rms.var + 1e-8)
+
         if self.use_task_encoder:
             state_embedding = self.state_encoder(inputs[:, :-self.task_dim])
             latent_state = self.task_encoder(inputs[:, -self.task_dim:])
@@ -129,12 +137,16 @@ class Policy(nn.Module):
         value, _ = self.forward(inputs)
         return value
 
-    def evaluate_actions(self, inputs, action, return_action_mean=False):
+    def evaluate_actions(self, inputs, action, return_action_mean=False, update_rms=False):
         value, actor_features = self.forward(inputs)
         dist = self.dist(actor_features)
 
         action_log_probs = dist.log_probs(action)
         dist_entropy = dist.entropy().mean()
+
+        # we call evaluate actions when processing the entire batch of data, so here's the right place to update normalisations
+        if (not self.args.disable_metalearner) and self.args.norm_latents_for_policy and update_rms:
+            self.state_rms.update(inputs)
 
         if not return_action_mean:
             return value, action_log_probs, dist_entropy
