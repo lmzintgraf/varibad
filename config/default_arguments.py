@@ -1,3 +1,16 @@
+"""
+This file lists all arguments you can set.
+Use this as a starting point for your own environments.
+
+Variables that might be worth tuning:
+--ppo_num_epochs
+--ppo_num_minibatch
+--policy_num_steps
+--vae_batch_num_trajs
+--vae_subsample_elbos (reduce this if you run into memory issues)
+--vae_subsample_decodes (reduce this if you run into memory issues)
+--kl_weight
+"""
 import argparse
 from utils.helpers import boolean_argument
 
@@ -17,7 +30,7 @@ def get_args(rest_args):
     # normalising things
     parser.add_argument('--norm_obs_for_policy', type=boolean_argument, default=False)
     parser.add_argument('--norm_latents_for_policy', type=boolean_argument, default=False)
-    parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=False)
+    parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=True)
     parser.add_argument('--normalise_actions', type=boolean_argument, default=False, help='normalise policy output')
 
     # network
@@ -27,8 +40,7 @@ def get_args(rest_args):
     parser.add_argument('--policy_anneal_lr', type=boolean_argument, default=False)
 
     # RL algorithm
-    parser.add_argument('--policy', type=str, default='a2c', help='choose: a2c, ppo')
-    parser.add_argument('--policy_optimiser', type=str, default='rmsprop', help='choose: rmsprop, adam')
+    parser.add_argument('--policy', type=str, default='ppo', help='choose: a2c, ppo')
 
     # PPO specific (uses Adam optimiser)
     parser.add_argument('--ppo_num_epochs', type=int, default=2, help='number of epochs per PPO update')
@@ -44,7 +56,7 @@ def get_args(rest_args):
     parser.add_argument('--lr_policy', type=float, default=0.0007, help='learning rate (default: 7e-4)')
     parser.add_argument('--num_processes', type=int, default=16,
                         help='how many training CPU processes / parallel environments to use (default: 16)')
-    parser.add_argument('--policy_num_steps', type=int, default=60,
+    parser.add_argument('--policy_num_steps', type=int, default=100,
                         help='number of env steps to do (per process) before updating')
     parser.add_argument('--policy_eps', type=float, default=1e-5, help='optimizer epsilon (1e-8 for ppo, 1e-5 for a2c)')
     parser.add_argument('--policy_init_std', type=float, default=1.0, help='only used for continuous actions')
@@ -70,8 +82,12 @@ def get_args(rest_args):
                         help='probability of adding a new trajectory to buffer')
     parser.add_argument('--vae_batch_num_trajs', type=int, default=25,
                         help='how many trajectories to use for VAE update')
+    parser.add_argument('--tbptt_stepsize', type=int, default=50,
+                        help='stepsize for truncated backpropagation through time; None uses max (horizon of BAMDP)')
     parser.add_argument('--vae_subsample_elbos', type=int, default=None,
                         help='for how many timesteps to compute the ELBO; None uses all')
+    parser.add_argument('--vae_subsample_decodes', type=int, default=None,
+                        help='number of reconstruction terms to subsample; None uses all')
     parser.add_argument('--num_vae_updates', type=int, default=3,
                         help='how many VAE update steps to take per meta-iteration')
     parser.add_argument('--pretrain_len', type=int, default=0, help='for how many updates to pre-train the VAE')

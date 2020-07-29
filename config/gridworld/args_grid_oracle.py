@@ -16,7 +16,7 @@ def get_args(rest_args):
 
     # Oracle
     parser.add_argument('--exp_label', default='exp', help='label for the experiment')
-    parser.add_argument('--disable_varibad', type=boolean_argument, default=True,
+    parser.add_argument('--disable_metalearner', type=boolean_argument, default=True,
                         help='Train policy w/o variBAD architecture')
     parser.add_argument('--latent_dim', type=int, default=16)
     parser.add_argument('--state_embedding_size', type=int, default=16)

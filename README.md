@@ -83,7 +83,7 @@ Another important parameter is the kl term (`--kl_weight`) for the ELBO term.
 
 ### Comments
 
-- When the flag `disable_varibad` is activated, the file `learner.py` will be used instead of `metalearner.py`. 
+- When the flag `disable_metalearner` is activated, the file `learner.py` will be used instead of `metalearner.py`. 
 This is a stripped down version without encoder, decoder, stochastic latent variables, etc. 
 It can be used to train (belief) oracles or policies that are good on average.
 - For the environments do not use `np.random` (it's not thread safe) but stick to `random` or `torch.random`.

@@ -1,3 +1,5 @@
+import numpy as np
+
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -112,7 +114,7 @@ class RNNEncoder(nn.Module):
 
         return latent_sample, latent_mean, latent_logvar, hidden_state
 
-    def forward(self, actions, states, rewards, hidden_state, return_prior, sample=True):
+    def forward(self, actions, states, rewards, hidden_state, return_prior, sample=True, detach_every=None):
         """
         Actions, states, rewards should be given in form [sequence_len * batch_size * dim].
         For one-step predictions, sequence_len=1 and hidden_state!=None.
@@ -143,9 +145,18 @@ class RNNEncoder(nn.Module):
         for i in range(len(self.fc_before_gru)):
             h = F.relu(self.fc_before_gru[i](h))
 
-        # GRU cell (output is outputs for each time step, hidden_state is last output)
-        output, _ = self.gru(h, hidden_state)
-        # gru_h = F.relu(output)  # TODO: should this be here?
+        if detach_every is None:
+            # GRU cell (output is outputs for each time step, hidden_state is last output)
+            output, _ = self.gru(h, hidden_state)
+        else:
+            output = []
+            for i in range(int(np.ceil(h.shape[0] / detach_every))):
+                curr_input = h[i*detach_every:i*detach_every+detach_every]  # pytorch caps if we overflow, nice
+                curr_output, hidden_state = self.gru(curr_input, hidden_state)
+                output.append(curr_output)
+                # detach hidden state; useful for BPTT when sequences are very long
+                hidden_state = hidden_state.detach()
+            output = torch.cat(output, dim=0)
         gru_h = output.clone()
 
         # forward through fully connected layers after GRU

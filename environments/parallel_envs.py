@@ -1,12 +1,9 @@
 """
 Based on https://github.com/ikostrikov/pytorch-a2c-ppo-acktr
 """
-import os
-
 import gym
 import torch
 
-from environments.env_utils import monitor
 from environments.env_utils.vec_env import VecEnvWrapper
 from environments.env_utils.vec_env.dummy_vec_env import DummyVecEnv
 from environments.env_utils.vec_env.subproc_vec_env import SubprocVecEnv
@@ -14,30 +11,21 @@ from environments.env_utils.vec_env.vec_normalize import VecNormalize
 from environments.wrappers import TimeLimitMask, VariBadWrapper
 
 
-def make_env(env_id, seed, rank, log_dir, allow_early_resets,
-             episodes_per_task, **kwargs):
+def make_env(env_id, seed, rank, episodes_per_task, **kwargs):
     def _thunk():
         env = gym.make(env_id, **kwargs)
         if seed is not None:
             env.seed(seed + rank)
-
         if str(env.__class__.__name__).find('TimeLimit') >= 0:
             env = TimeLimitMask(env)
-
         env = VariBadWrapper(env=env, episodes_per_task=episodes_per_task)
-
-        # TODO: is this necessary?
-        if log_dir is not None:
-            env = monitor.Monitor(env, os.path.join(log_dir, str(rank)),
-                                  allow_early_resets=allow_early_resets)
-
         return env
 
     return _thunk
 
 
-def make_vec_envs(env_name, seed, num_processes, gamma, log_dir,
-                  device, allow_early_resets, episodes_per_task,
+def make_vec_envs(env_name, seed, num_processes, gamma,
+                  device, episodes_per_task,
                   normalise_obs, normalise_rew,
                   obs_rms, ret_rms, rank_offset=0,
                   **kwargs):
@@ -45,8 +33,7 @@ def make_vec_envs(env_name, seed, num_processes, gamma, log_dir,
     :param obs_rms: running mean and std for observations
     :param ret_rms: running return and std for rewards
     """
-    envs = [make_env(env_id=env_name, seed=seed, rank=rank_offset + i, log_dir=log_dir,
-                     allow_early_resets=allow_early_resets,
+    envs = [make_env(env_id=env_name, seed=seed, rank=rank_offset + i,
                      episodes_per_task=episodes_per_task, **kwargs)
             for i in range(num_processes)]
 

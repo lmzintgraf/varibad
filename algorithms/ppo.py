@@ -11,6 +11,7 @@ class PPO:
                  actor_critic,
                  value_loss_coef,
                  entropy_coef,
+                 policy_optimiser,
                  policy_anneal_lr,
                  train_steps,
                  optimiser_vae=None,
@@ -21,6 +22,7 @@ class PPO:
                  eps=None,
                  use_huber_loss=True,
                  use_clipped_value_loss=True,
+                 alpha=None
                  ):
 
         self.actor_critic = actor_critic
@@ -35,7 +37,11 @@ class PPO:
         self.use_clipped_value_loss = use_clipped_value_loss
         self.use_huber_loss = use_huber_loss
 
-        self.optimiser = optim.Adam(actor_critic.parameters(), lr=lr, eps=eps)
+        # optimiser
+        if policy_optimiser == 'adam':
+            self.optimiser = optim.Adam(actor_critic.parameters(), lr=lr, eps=eps)
+        elif policy_optimiser == 'rmsprop':
+            self.optimiser = optim.RMSprop(actor_critic.parameters(), lr=lr, eps=eps, alpha=alpha)
         self.optimiser_vae = optimiser_vae
 
         if policy_anneal_lr:
@@ -60,7 +66,8 @@ class PPO:
         # otherwise, we update it after we update the policy
         if rlloss_through_encoder:
             # recompute embeddings (to build computation graph)
-            utl.recompute_embeddings(policy_storage, encoder, sample=False, update_idx=0)
+            utl.recompute_embeddings(policy_storage, encoder, sample=False, update_idx=0,
+                                     detach_every=args.tbptt_stepsize if hasattr(args, 'tbptt_stepsize') else None)
 
         value_loss_epoch = 0
         action_loss_epoch = 0
@@ -144,7 +151,8 @@ class PPO:
 
                 if rlloss_through_encoder:
                     # recompute embeddings (to build computation graph)
-                    utl.recompute_embeddings(policy_storage, encoder, sample=False, update_idx=e + 1)
+                    utl.recompute_embeddings(policy_storage, encoder, sample=False, update_idx=e+1,
+                                             detach_every=args.tbptt_stepsize if hasattr(args, 'tbptt_stepsize') else None)
 
         if (not rlloss_through_encoder) and (self.optimiser_vae is not None):
             for _ in range(args.num_vae_updates):
@@ -156,9 +164,6 @@ class PPO:
         action_loss_epoch /= num_updates
         dist_entropy_epoch /= num_updates
         loss_epoch /= num_updates
-
-        if self.lr_scheduler:
-            self.lr_scheduler.step()
 
         return value_loss_epoch, action_loss_epoch, dist_entropy_epoch, loss_epoch
 

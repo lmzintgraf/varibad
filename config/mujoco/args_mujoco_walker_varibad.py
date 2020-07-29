@@ -16,7 +16,7 @@ def get_args(rest_args):
 
     # variBAD
     parser.add_argument('--exp_label', default='varibad', help='label for the experiment')
-    parser.add_argument('--disable_varibad', type=boolean_argument, default=False,
+    parser.add_argument('--disable_metalearner', type=boolean_argument, default=False,
                         help='Train policy w/o variBAD architecture')
 
     # env
@@ -71,7 +71,7 @@ def get_args(rest_args):
                         help='how many trajectories to keep in VAE buffer')
     parser.add_argument('--vae_buffer_add_thresh', type=float, default=0.8, help='prob of adding a new traj to buffer')
     parser.add_argument('--vae_batch_num_trajs', type=int, default=10)
-    parser.add_argument('--vae_batch_num_enc_lens', type=int, default=50)
+    parser.add_argument('--vae_subsample_elbos', type=int, default=50)
     parser.add_argument('--num_vae_updates', type=int, default=1,
                         help='how many VAE update steps to take per meta-iteration')
     parser.add_argument('--kl_weight', type=float, default=0.1, help='weight for the KL term')
@@ -82,10 +82,10 @@ def get_args(rest_args):
 
     # - encoder
     parser.add_argument('--latent_dim', type=int, default=16, help='dimensionality of latent space')
-    parser.add_argument('--aggregator_hidden_size', type=int, default=128,
+    parser.add_argument('--encoder_gru_hidden_size', type=int, default=128,
                         help='dimensionality of hidden state of the rnn')
-    parser.add_argument('--layers_before_aggregator', nargs='+', type=int, default=[])
-    parser.add_argument('--layers_after_aggregator', nargs='+', type=int, default=[])
+    parser.add_argument('--encoder_layers_before_gru', nargs='+', type=int, default=[])
+    parser.add_argument('--encoder_layers_after_gru', nargs='+', type=int, default=[])
     parser.add_argument('--state_embedding_size', type=int, default=32)
     parser.add_argument('--action_embedding_size', type=int, default=16)
     parser.add_argument('--reward_embedding_size', type=int, default=16)

@@ -73,22 +73,7 @@ def main():
     elif env == 'mujoco_walker_varibad':
         args = args_mujoco_walker_varibad.get_args(rest_args)
 
-    # log directories TODO: check if really necessary to have monitor wrap?
-    try:
-        os.makedirs(args.agent_log_dir)
-    except OSError:
-        files = glob.glob(os.path.join(args.agent_log_dir, '*.monitor.csv'))
-        for f in files:
-            os.remove(f)
-    eval_log_dir = args.agent_log_dir + "_eval"
-    try:
-        os.makedirs(eval_log_dir)
-    except OSError:
-        files = glob.glob(os.path.join(eval_log_dir, '*.monitor.csv'))
-        for f in files:
-            os.remove(f)
-
-    # warning
+    # warning for deterministic execution
     if args.deterministic_execution:
         print('Envoking deterministic code execution.')
         if torch.backends.cudnn.enabled:
@@ -98,13 +83,21 @@ def main():
                                'Warning: This will slow things down and might break A2C if '
                                'policy_num_steps < env._max_episode_steps.')
 
+    # clean up arguments
+        if args.disable_decoder:
+            args.decode_reward = False
+        args.decode_state = False
+        args.decode_task = False
+
+    if args.decode_only_past:
+        args.split_batches_by_elbo = True
+
+    # start training
     all_seeds = args.seed
     for seed in all_seeds:
         args.seed = seed
-
-        # start training
-        if args.disable_varibad:
-            # When the flag `disable_varibad` is activated, the file `learner.py` will be used instead of `metalearner.py`.
+        if args.disable_metalearner:
+            # If `disable_metalearner` is true, the file `learner.py` will be used instead of `metalearner.py`.
             # This is a stripped down version without encoder, decoder, stochastic latent variables, etc.
             learner = Learner(args)
         else:

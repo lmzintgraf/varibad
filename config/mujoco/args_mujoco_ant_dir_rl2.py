@@ -16,7 +16,7 @@ def get_args(rest_args):
 
     # RL2
     parser.add_argument('--exp_label', default='rl2', help='label for the experiment')
-    parser.add_argument('--disable_varibad', type=boolean_argument, default=False,
+    parser.add_argument('--disable_metalearner', type=boolean_argument, default=False,
                         help='Train a normal FF policy without the variBAD architecture')
     parser.add_argument('--disable_decoder', type=boolean_argument, default=True)
     parser.add_argument('--disable_stochasticity_in_latent', type=boolean_argument, default=True)
@@ -80,10 +80,10 @@ def get_args(rest_args):
     parser.add_argument('--vae_buffer_add_thresh', type=float, default=0, help='prob of adding a new traj to buffer')
 
     # - encoder (now part of the policy!)
-    parser.add_argument('--aggregator_hidden_size', type=int, default=128,
+    parser.add_argument('--encoder_gru_hidden_size', type=int, default=128,
                         help='dimensionality of hidden state of the rnn')
-    parser.add_argument('--layers_before_aggregator', nargs='+', type=int, default=[])
-    parser.add_argument('--layers_after_aggregator', nargs='+', type=int, default=[])
+    parser.add_argument('--encoder_layers_before_gru', nargs='+', type=int, default=[])
+    parser.add_argument('--encoder_layers_after_gru', nargs='+', type=int, default=[])
     parser.add_argument('--state_embedding_size', type=int, default=32)
     parser.add_argument('--action_embedding_size', type=int, default=16)
     parser.add_argument('--reward_embedding_size', type=int, default=16)

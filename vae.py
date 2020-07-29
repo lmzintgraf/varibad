@@ -58,9 +58,9 @@ class VaribadVAE:
     def initialise_encoder(self):
         """ Initialises and returns an RNN encoder """
         encoder = RNNEncoder(
-            layers_before_gru=self.args.layers_before_aggregator,
-            hidden_size=self.args.aggregator_hidden_size,
-            layers_after_gru=self.args.layers_after_aggregator,
+            layers_before_gru=self.args.encoder_layers_before_gru,
+            hidden_size=self.args.encoder_gru_hidden_size,
+            layers_after_gru=self.args.encoder_layers_after_gru,
             latent_dim=self.args.latent_dim,
             action_dim=self.args.action_dim,
             action_embed_dim=self.args.action_embedding_size,
@@ -228,11 +228,6 @@ class VaribadVAE:
             logS = all_logvars[:-1]
             kl_divergences = 0.5 * (torch.sum(logS, dim=-1) - torch.sum(logE, dim=-1) - gauss_dim + torch.sum(
                 1 / torch.exp(logS) * torch.exp(logE), dim=-1) + ((m - mu) / torch.exp(logS) * (m - mu)).sum(dim=-1))
-
-        if self.args.learn_prior:
-            mask = torch.ones(len(kl_divergences))
-            mask[0] = 0
-            kl_divergences = kl_divergences * mask
 
         # returns, for each ELBO_t term, one KL (so H+1 kl's)
         if len_encoder is not None:
@@ -616,7 +611,7 @@ class VaribadVAE:
         # get a mini-batch
         vae_prev_obs, vae_next_obs, vae_actions, vae_rewards, vae_tasks, \
         len_encoder, trajectory_lens = self.rollout_storage.get_batch(num_rollouts=self.args.vae_batch_num_trajs,
-                                                                      num_enc_len=self.args.vae_batch_num_enc_lens)
+                                                                      num_enc_len=self.args.vae_subsample_elbos)
         # vae_prev_obs will be of size: max trajectory len x num trajectories x dimension of observations
         # len_encoder will be of size:  number of trajectories x data_per_rollout
 
@@ -625,7 +620,9 @@ class VaribadVAE:
                                                         states=vae_next_obs,
                                                         rewards=vae_rewards,
                                                         hidden_state=None,
-                                                        return_prior=True)
+                                                        return_prior=True,
+                                                        detach_every=self.args.tbptt_stepsize if hasattr(self.args, 'tbptt_stepsize') else None,
+                                                        )
 
         if self.args.split_batches_by_task:
             losses = self.compute_loss_split_batches_by_task(latent_mean, latent_logvar, vae_prev_obs, vae_next_obs,

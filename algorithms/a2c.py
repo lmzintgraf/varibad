@@ -12,6 +12,9 @@ class A2C:
                  actor_critic,
                  value_loss_coef,
                  entropy_coef,
+                 policy_optimiser,
+                 policy_anneal_lr,
+                 train_steps,
                  optimiser_vae=None,
                  lr=None,
                  eps=None,
@@ -26,8 +29,17 @@ class A2C:
         self.entropy_coef = entropy_coef
 
         # optimiser
-        self.optimizer = optim.RMSprop(actor_critic.parameters(), lr, eps=eps, alpha=alpha)
+        if policy_optimiser == 'adam':
+            self.optimiser = optim.Adam(actor_critic.parameters(), lr=lr, eps=eps)
+        elif policy_optimiser == 'rmsprop':
+            self.optimiser = optim.RMSprop(actor_critic.parameters(), lr, eps=eps, alpha=alpha)
         self.optimiser_vae = optimiser_vae
+
+        if policy_anneal_lr:
+            lam = lambda f: 1-f/train_steps
+            self.lr_scheduler = optim.lr_scheduler.LambdaLR(self.optimiser, lr_lambda=lam)
+        else:
+            self.lr_scheduler = None
 
     def update(self,
                args,
@@ -42,7 +54,8 @@ class A2C:
 
         if rlloss_through_encoder:
             # re-compute encoding (to build the computation graph from scratch)
-            utl.recompute_embeddings(policy_storage, encoder, sample=False, update_idx=0)
+            utl.recompute_embeddings(policy_storage, encoder, sample=False, update_idx=0,
+                                     detach_every=args.tbptt_stepsize if hasattr(args, 'tbptt_stepsize') else None)
 
         data_generator = policy_storage.feed_forward_generator(advantages, 1)
         for sample in data_generator:
@@ -69,7 +82,7 @@ class A2C:
             # --  UPDATE --
 
             # zero out the gradients
-            self.optimizer.zero_grad()
+            self.optimiser.zero_grad()
             if rlloss_through_encoder:
                 self.optimiser_vae.zero_grad()
 
@@ -91,7 +104,7 @@ class A2C:
                 nn.utils.clip_grad_norm_(encoder.parameters(), args.policy_max_grad_norm)
 
             # update
-            self.optimizer.step()
+            self.optimiser.step()
             if rlloss_through_encoder:
                 self.optimiser_vae.step()
 

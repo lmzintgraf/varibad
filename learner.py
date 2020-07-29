@@ -38,8 +38,7 @@ class Learner:
 
         # initialise environments
         self.envs = make_vec_envs(env_name=args.env_name, seed=args.seed, num_processes=args.num_processes,
-                                  gamma=args.policy_gamma, log_dir=args.agent_log_dir, device=device,
-                                  allow_early_resets=False,
+                                  gamma=args.policy_gamma, device=device,
                                   episodes_per_task=self.args.max_rollouts_per_task,
                                   normalise_obs=args.norm_obs_for_policy, normalise_rew=args.norm_rew_for_policy,
                                   obs_rms=None, ret_rms=None,

@@ -119,6 +119,7 @@ def recompute_embeddings(
         encoder,
         sample,
         update_idx,
+        detach_every
 ):
     # get the prior
     latent_sample = [policy_storage.latent_samples[0].detach().clone()]
@@ -142,7 +143,8 @@ def recompute_embeddings(
                                 policy_storage.rewards_raw[i:i + 1],
                                 h,
                                 sample=sample,
-                                return_prior=False
+                                return_prior=False,
+                                detach_every=detach_every
                                 )
 
         # print(i, reset_task.sum())
