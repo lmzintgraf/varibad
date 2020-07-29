@@ -22,7 +22,7 @@ class VariBadWrapper(gym.Wrapper):
         Wrapper, creates a multi-episode (BA)MDP around a one-episode MDP. Automatically deals with
         - horizons H in the MDP vs horizons H+ in the BAMDP,
         - resetting the tasks
-        - adding the timestep / done info to the state (might be needed to make states markov)
+        - adding the done info to the state (might be needed to make states markov)
         """
 
         super().__init__(env)
@@ -68,33 +68,27 @@ class VariBadWrapper(gym.Wrapper):
         self.done_mdp = True
 
     def reset(self, task=None):
+        """ Resets the BAMDP """
 
         # reset task
         self.env.reset_task(task)
-
-        self.episode_count = 0
-        self.step_count_bamdp = 0
-
         # normal reset
         try:
             state = self.env.reset()
         except AttributeError:
             state = self.env.unwrapped.reset()
 
-        # if self.add_timestep:
-        #     state = np.concatenate((state, [0.0]))
-
+        self.episode_count = 0
+        self.step_count_bamdp = 0
+        self.done_mdp = False
         if self.add_done_info:
             state = np.concatenate((state, [0.0]))
-
-        self.done_mdp = False
 
         return state
 
     def reset_mdp(self):
+        """ Resets the underlying MDP only (*not* the task). """
         state = self.env.reset()
-        # if self.add_timestep:
-        #     state = np.concatenate((state, [self.step_count_bamdp / self.horizon_bamdp]))
         if self.add_done_info:
             state = np.concatenate((state, [0.0]))
         self.done_mdp = False
@@ -107,8 +101,6 @@ class VariBadWrapper(gym.Wrapper):
 
         info['done_mdp'] = self.done_mdp
 
-        # if self.add_timestep:
-        #     state = np.concatenate((state, [self.step_count_bamdp / self.horizon_bamdp]))
         if self.add_done_info:
             state = np.concatenate((state, [float(self.done_mdp)]))
 
@@ -133,7 +125,6 @@ class TimeLimitMask(gym.Wrapper):
         obs, rew, done, info = self.env.step(action)
         if done and self.env._max_episode_steps == self.env._elapsed_steps:
             info['bad_transition'] = True
-
         return obs, rew, done, info
 
     def reset(self, **kwargs):

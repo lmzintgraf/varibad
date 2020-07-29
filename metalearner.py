@@ -415,7 +415,7 @@ class MetaLearner:
                 obs_rms = self.envs.venv.obs_rms
                 utl.save_obj(obs_rms, save_path, "env_obs_rms{0}.pkl".format(self.iter_idx))
 
-            # --- log some other things ---
+        # --- log some other things ---
 
         if self.iter_idx % self.args.log_interval == 0:
 

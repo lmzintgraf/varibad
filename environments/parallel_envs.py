@@ -26,6 +26,7 @@ def make_env(env_id, seed, rank, log_dir, allow_early_resets,
 
         env = VariBadWrapper(env=env, episodes_per_task=episodes_per_task)
 
+        # TODO: is this necessary?
         if log_dir is not None:
             env = monitor.Monitor(env, os.path.join(log_dir, str(rank)),
                                   allow_early_resets=allow_early_resets)
@@ -109,9 +110,7 @@ class VecPyTorch(VecEnvWrapper):
         return obs, reward, done, info
 
     def __getattr__(self, attr):
-        """
-        If env does not have the attribute then call the attribute in the wrapped_env
-        """
+        """ If env does not have the attribute then call the attribute in the wrapped_env """
 
         if attr in ['num_states', '_max_episode_steps']:
             return self.unwrapped.get_env_attr(attr)
