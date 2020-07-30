@@ -3,8 +3,6 @@ Main scripts to start experiments.
 Takes a flag --env-type (see below for choices) and loads the parameters used in the paper.
 """
 import argparse
-import glob
-import os
 import warnings
 
 import torch
@@ -13,17 +11,17 @@ import torch
 from config.gridworld import \
     args_grid_oracle, args_grid_belief_oracle, args_grid_rl2, args_grid_varibad
 from config.mujoco import \
-    args_mujoco_cheetah_dir_oracle, args_mujoco_cheetah_dir_rl2, args_mujoco_cheetah_dir_varibad, \
-    args_mujoco_cheetah_vel_oracle, args_mujoco_cheetah_vel_rl2, args_mujoco_cheetah_vel_varibad, \
-    args_mujoco_ant_dir_oracle, args_mujoco_ant_dir_rl2, args_mujoco_ant_dir_varibad, \
-    args_mujoco_walker_oracle, args_mujoco_walker_rl2, args_mujoco_walker_varibad
+    args_cheetah_dir_oracle, args_cheetah_dir_rl2, args_cheetah_dir_varibad, \
+    args_cheetah_vel_oracle, args_cheetah_vel_rl2, args_cheetah_vel_varibad, \
+    args_ant_dir_oracle, args_ant_dir_rl2, args_ant_dir_varibad, \
+    args_walker_oracle, args_walker_rl2, args_walker_varibad
 from learner import Learner
 from metalearner import MetaLearner
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env-type', default='gridworld_varibad')
+    parser.add_argument('--env-type', default='cheetah_dir_oracle')
     args, rest_args = parser.parse_known_args()
     env = args.env_type
 
@@ -42,36 +40,36 @@ def main():
     # --- MUJOCO ---
 
     # - AntDir -
-    elif env == 'mujoco_ant_dir_oracle':
-        args = args_mujoco_ant_dir_oracle.get_args(rest_args)
-    elif env == 'mujoco_ant_dir_rl2':
-        args = args_mujoco_ant_dir_rl2.get_args(rest_args)
-    elif env == 'mujoco_ant_dir_varibad':
-        args = args_mujoco_ant_dir_varibad.get_args(rest_args)
+    elif env == 'ant_dir_oracle':
+        args = args_ant_dir_oracle.get_args(rest_args)
+    elif env == 'ant_dir_rl2':
+        args = args_ant_dir_rl2.get_args(rest_args)
+    elif env == 'ant_dir_varibad':
+        args = args_ant_dir_varibad.get_args(rest_args)
     #
     # - CheetahDir -
-    elif env == 'mujoco_cheetah_dir_oracle':
-        args = args_mujoco_cheetah_dir_oracle.get_args(rest_args)
-    elif env == 'mujoco_cheetah_dir_rl2':
-        args = args_mujoco_cheetah_dir_rl2.get_args(rest_args)
-    elif env == 'mujoco_cheetah_dir_varibad':
-        args = args_mujoco_cheetah_dir_varibad.get_args(rest_args)
+    elif env == 'cheetah_dir_oracle':
+        args = args_cheetah_dir_oracle.get_args(rest_args)
+    elif env == 'cheetah_dir_rl2':
+        args = args_cheetah_dir_rl2.get_args(rest_args)
+    elif env == 'cheetah_dir_varibad':
+        args = args_cheetah_dir_varibad.get_args(rest_args)
     #
     # - CheetahVel -
-    elif env == 'mujoco_cheetah_vel_oracle':
-        args = args_mujoco_cheetah_vel_oracle.get_args(rest_args)
-    elif env == 'mujoco_cheetah_vel_rl2':
-        args = args_mujoco_cheetah_vel_rl2.get_args(rest_args)
-    elif env == 'mujoco_cheetah_vel_varibad':
-        args = args_mujoco_cheetah_vel_varibad.get_args(rest_args)
+    elif env == 'cheetah_vel_oracle':
+        args = args_cheetah_vel_oracle.get_args(rest_args)
+    elif env == 'cheetah_vel_rl2':
+        args = args_cheetah_vel_rl2.get_args(rest_args)
+    elif env == 'cheetah_vel_varibad':
+        args = args_cheetah_vel_varibad.get_args(rest_args)
     #
     # - Walker -
-    elif env == 'mujoco_walker_oracle':
-        args = args_mujoco_walker_oracle.get_args(rest_args)
-    elif env == 'mujoco_walker_rl2':
-        args = args_mujoco_walker_rl2.get_args(rest_args)
-    elif env == 'mujoco_walker_varibad':
-        args = args_mujoco_walker_varibad.get_args(rest_args)
+    elif env == 'walker_oracle':
+        args = args_walker_oracle.get_args(rest_args)
+    elif env == 'walker_rl2':
+        args = args_walker_rl2.get_args(rest_args)
+    elif env == 'walker_varibad':
+        args = args_walker_varibad.get_args(rest_args)
 
     # warning for deterministic execution
     if args.deterministic_execution:

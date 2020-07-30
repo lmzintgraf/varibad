@@ -40,14 +40,14 @@ def get_args(rest_args):
     parser.add_argument('--policy', type=str, default='a2c', help='choose: a2c, ppo')
     parser.add_argument('--policy_optimiser', type=str, default='rmsprop', help='choose: rmsprop, adam')
 
-    # PPO specific (uses Adam optimiser)
+    # PPO specific
     parser.add_argument('--ppo_num_epochs', type=int, default=2, help='number of epochs per PPO update')
     parser.add_argument('--ppo_num_minibatch', type=int, default=4, help='number of minibatches to split the data')
     parser.add_argument('--ppo_use_huberloss', type=boolean_argument, default=True, help='use huberloss instead of MSE')
     parser.add_argument('--ppo_use_clipped_value_loss', type=boolean_argument, default=True, help='clip value loss')
     parser.add_argument('--ppo_clip_param', type=float, default=0.05, help='clamp param')
 
-    # A2C specific (uses RMSProp optimiser)
+    # A2C specific
     parser.add_argument('--a2c_alpha', type=float, default=0.99, help='RMSprop optimizer alpha (default: 0.99)')
 
     # other hyperparameters

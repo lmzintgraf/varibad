@@ -11,9 +11,9 @@ def get_args(rest_args):
     # --- GENERAL ---
 
     parser.add_argument('--num_frames', type=int, default=1e8, help='number of frames to train')
-    parser.add_argument('--max_rollouts_per_task', type=int, default=4)
+    parser.add_argument('--max_rollouts_per_task', type=int, default=2)
     parser.add_argument('--exp_label', default='oracle', help='label for the experiment')
-    parser.add_argument('--env_name', default='GridNaviOracle-v0', help='environment to train on')
+    parser.add_argument('--env_name', default='HalfCheetahDirOracle-v0', help='environment to train on')
 
     parser.add_argument('--disable_metalearner', type=boolean_argument, default=True,
                         help='Train a normal policy without the variBAD architecture')
@@ -21,13 +21,13 @@ def get_args(rest_args):
     # --- POLICY ---
 
     # normalising things
-    parser.add_argument('--norm_obs_for_policy', type=boolean_argument, default=False)
+    parser.add_argument('--norm_obs_for_policy', type=boolean_argument, default=True)
     parser.add_argument('--norm_latents_for_policy', type=boolean_argument, default=False)
-    parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=False)
+    parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=True)
     parser.add_argument('--normalise_actions', type=boolean_argument, default=False, help='normalise policy output')
 
     # network
-    parser.add_argument('--policy_layers', nargs='+', default=[32])
+    parser.add_argument('--policy_layers', nargs='+', default=[128, 128])
     parser.add_argument('--policy_activation_function', type=str, default='tanh', help='tanh/relu/leaky-relu')
     parser.add_argument('--policy_initialisation', type=str, default='normc', help='normc/orthogonal')
     parser.add_argument('--policy_anneal_lr', type=boolean_argument, default=False)
@@ -51,7 +51,7 @@ def get_args(rest_args):
     parser.add_argument('--a2c_alpha', type=float, default=0.99, help='RMSprop optimizer alpha (default: 0.99)')
 
     # other hyperparameters
-    parser.add_argument('--lr_policy', type=float, default=0.0007, help='learning rate (default: 7e-4)')
+    parser.add_argument('--lr_policy', type=float, default=7e-4, help='learning rate (default: 7e-4)')
     parser.add_argument('--num_processes', type=int, default=16,
                         help='how many training CPU processes / parallel environments to use (default: 16)')
     parser.add_argument('--policy_num_steps', type=int, default=30,

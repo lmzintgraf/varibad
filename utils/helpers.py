@@ -103,8 +103,8 @@ def seed(seed, deterministic_execution=False):
         torch.backends.cudnn.benchmark = False
     else:
         print('Note that due to parallel processing results will be similar but not identical. '
-              'Use only one process and set --deterministic_execution to True if you want identical results. '
-              '(Not recommended; will slow code down and might not be possible with A2C) ')
+              'Use only one process and set --deterministic_execution to True if you want identical results '
+              '(only recommended for debugging).')
 
 
 def update_linear_schedule(optimizer, epoch, total_num_epochs, initial_lr):
@@ -259,4 +259,8 @@ def get_task_dim(args):
 
 def get_num_tasks(args):
     env = gym.make(args.env_name)
-    return env.num_tasks
+    try:
+        num_tasks = env.num_tasks
+    except AttributeError:
+        num_tasks = None
+    return num_tasks

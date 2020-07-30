@@ -91,7 +91,8 @@ class RolloutStorageVAE(object):
                 self.actions[:, self.insert_idx:self.insert_idx+self.num_processes] = self.running_actions
                 self.rewards[:, self.insert_idx:self.insert_idx+self.num_processes] = self.running_rewards
                 if self.tasks is not None:
-                    self.tasks[self.insert_idx:self.insert_idx+self.num_processes] = self.running_tasks
+                    insert_shape = self.tasks[self.insert_idx:self.insert_idx+self.num_processes].shape
+                    self.tasks[self.insert_idx:self.insert_idx+self.num_processes] = self.running_tasks.view(insert_shape)
                 self.trajectory_lens[self.insert_idx:self.insert_idx+self.num_processes] = self.curr_timestep.clone()
 
                 self.insert_idx += self.num_processes
