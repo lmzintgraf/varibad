@@ -270,15 +270,16 @@ class VaribadVAE:
         else:
             latent_samples = torch.cat((latent_mean, latent_logvar), dim=-1)
 
-        n_elbos = latent_mean.shape[0]  # includes the prior
-        n_horizon = np.unique(trajectory_lens)[0]
+        num_elbos = latent_samples.shape[0]
+        num_decodes = vae_prev_obs.shape[0]
+        batchsize = latent_samples.shape[1]
 
         # expand the state/rew/action inputs to the decoder (to match size of latents)
         # shape will be: [num tasks in batch] x [num elbos] x [len trajectory (reconstrution loss)] x [dimension]
-        dec_prev_obs = vae_prev_obs.unsqueeze(0).expand((n_elbos, *vae_prev_obs.shape))
-        dec_next_obs = vae_next_obs.unsqueeze(0).expand((n_elbos, *vae_next_obs.shape))
-        dec_actions = vae_actions.unsqueeze(0).expand((n_elbos, *vae_actions.shape))
-        dec_rewards = vae_rewards.unsqueeze(0).expand((n_elbos, *vae_rewards.shape))
+        dec_prev_obs = vae_prev_obs.unsqueeze(0).expand((num_elbos, *vae_prev_obs.shape))
+        dec_next_obs = vae_next_obs.unsqueeze(0).expand((num_elbos, *vae_next_obs.shape))
+        dec_actions = vae_actions.unsqueeze(0).expand((num_elbos, *vae_actions.shape))
+        dec_rewards = vae_rewards.unsqueeze(0).expand((num_elbos, *vae_rewards.shape))
 
         # subsample reconstruction terms
         if self.args.vae_subsample_decodes is not None:
@@ -295,7 +296,7 @@ class VaribadVAE:
 
         # expand the latent (to match the number of state/rew/action inputs to the decoder)
         # shape will be: [num tasks in batch] x [num elbos] x [len trajectory (reconstrution loss)] x [dimension]
-        dec_embedding = latent_samples.unsqueeze(0).expand((n_horizon, *latent_samples.shape)).transpose(1, 0)
+        dec_embedding = latent_samples.unsqueeze(0).expand((num_decodes, *latent_samples.shape)).transpose(1, 0)
 
         if self.args.decode_reward:
             # compute reconstruction loss for this trajectory (for each timestep that was encoded, decode everything and sum it up)
