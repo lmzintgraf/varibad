@@ -108,21 +108,21 @@ class Learner:
 
         # initialise policy network
         policy_net = Policy(
-            # general
-            obs_dim=int(self.args.condition_policy_on_state) * state_dim,
+            args=self.args,
+            obs_dim=state_dim,
             action_space=self.envs.action_space,
             init_std=self.args.policy_init_std,
             hidden_layers=self.args.policy_layers,
             activation_function=self.args.policy_activation_function,
-            use_task_encoder=use_task_encoder,
-            # task encoding things (for oracle)
-            task_dim=task_dim,
-            latent_dim=latent_dim,
-            state_embed_dim=state_embedding_size,
-            #
+            policy_initialisation=self.args.policy_initialisation,
             normalise_actions=self.args.normalise_actions,
             action_low=action_low,
             action_high=action_high,
+            #
+            use_task_encoder=use_task_encoder,
+            task_dim=task_dim,
+            latent_dim=latent_dim,
+            state_embed_dim=state_embedding_size,
         ).to(device)
 
         # initialise policy
@@ -132,6 +132,9 @@ class Learner:
                 policy_net,
                 self.args.policy_value_loss_coef,
                 self.args.policy_entropy_coef,
+                policy_optimiser=self.args.policy_optimiser,
+                policy_anneal_lr=self.args.policy_anneal_lr,
+                train_steps=self.args.num_updates,
                 lr=self.args.lr_policy,
                 eps=self.args.policy_eps,
                 alpha=self.args.a2c_alpha,
@@ -142,6 +145,9 @@ class Learner:
                 policy_net,
                 self.args.policy_value_loss_coef,
                 self.args.policy_entropy_coef,
+                policy_optimiser=self.args.policy_optimiser,
+                policy_anneal_lr=self.args.policy_anneal_lr,
+                train_steps=self.args.num_updates,
                 lr=self.args.lr_policy,
                 eps=self.args.policy_eps,
                 ppo_epoch=self.args.ppo_num_epochs,

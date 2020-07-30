@@ -58,10 +58,10 @@ def get_augmented_obs(args, obs,
     else:
         sample_embeddings = args.sample_embeddings
 
-    if not args.condition_policy_on_state:
+    if (not args.disable_metalearner) and (not args.condition_policy_on_state):
         obs_augmented = torch.zeros(0, ).to(device)
 
-    if args.add_nonlinearity_to_latent:
+    if (not args.disable_metalearner) and args.add_nonlinearity_to_latent:
         latent_mean = F.relu(latent_mean)
         latent_logvar = F.relu(latent_logvar)
 

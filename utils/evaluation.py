@@ -35,7 +35,7 @@ def evaluate(args,
     # --- initialise environments and latents ---
 
     envs = make_vec_envs(env_name, seed=args.seed * 42 + iter_idx, num_processes=num_processes,
-                         gamma=args.policy_gamma, log_dir=args.agent_log_dir,
+                         gamma=args.policy_gamma,
                          device=device,
                          rank_offset=num_processes + 1,  # to use diff tmp folders than main processes
                          episodes_per_task=num_episodes,

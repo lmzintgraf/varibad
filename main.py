@@ -84,12 +84,12 @@ def main():
                                'policy_num_steps < env._max_episode_steps.')
 
     # clean up arguments
-        if args.disable_decoder:
-            args.decode_reward = False
-        args.decode_state = False
-        args.decode_task = False
+    if hasattr(args, 'disable_decoder') and args.disable_decoder:
+        args.decode_reward = False
+    args.decode_state = False
+    args.decode_task = False
 
-    if args.decode_only_past:
+    if hasattr(args, 'decode_only_past') and args.decode_only_past:
         args.split_batches_by_elbo = True
 
     # start training
