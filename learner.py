@@ -349,8 +349,8 @@ class Learner:
             self.logger.add('policy/value', run_stats[2].mean(), self.iter_idx)
 
             param_list = list(self.policy.actor_critic.parameters())
-            param_mean = np.mean([param_list[i].data.mean() for i in range(len(param_list))])
-            param_grad_mean = np.mean([param_list[i].grad.mean() for i in range(len(param_list))])
+            param_mean = np.mean([param_list[i].data.cpu().numpy().mean() for i in range(len(param_list))])
+            param_grad_mean = np.mean([param_list[i].grad.cpu().numpy().mean() for i in range(len(param_list))])
             self.logger.add('weights/policy', param_mean, self.iter_idx)
             self.logger.add('weights/policy_std', param_list[0].data.mean(), self.iter_idx)
             self.logger.add('gradients/policy', param_grad_mean, self.iter_idx)
