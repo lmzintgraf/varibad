@@ -73,6 +73,7 @@ def get_args(rest_args):
     # logging, saving, evaluation
     parser.add_argument('--log_interval', type=int, default=25, help='log interval, one log per n updates')
     parser.add_argument('--save_interval', type=int, default=500, help='save interval, one save per n updates')
+    parser.add_argument('--save_intermediate_models', type=boolean_argument, default=False, help='save all models')
     parser.add_argument('--eval_interval', type=int, default=25, help='eval interval, one eval per n updates')
     parser.add_argument('--vis_interval', type=int, default=500, help='visualisation interval, one eval per n updates')
     parser.add_argument('--results_log_dir', default=None, help='directory to save results (None uses ./logs)')

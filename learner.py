@@ -177,6 +177,9 @@ class Learner:
         self.policy_storage.prev_obs_normalised[0].copy_(prev_obs_normalised)
         self.policy_storage.to(device)
 
+        # log once before training
+        self.log(None, None, start_time)
+
         for self.iter_idx in range(self.args.num_updates):
 
             # check if we flushed the policy storage
@@ -322,16 +325,22 @@ class Learner:
             save_path = os.path.join(self.logger.full_output_folder, 'models')
             if not os.path.exists(save_path):
                 os.mkdir(save_path)
-            torch.save(self.policy.actor_critic, os.path.join(save_path, "policy{0}.pt".format(self.iter_idx)))
 
-            # save normalisation params of envs
-            if self.args.norm_rew_for_policy:
-                # save rolling mean and std
-                rew_rms = self.envs.venv.ret_rms
-                utl.save_obj(rew_rms, save_path, "env_rew_rms{0}.pkl".format(self.iter_idx))
-            if self.args.norm_obs_for_policy:
-                obs_rms = self.envs.venv.obs_rms
-                utl.save_obj(obs_rms, save_path, "env_obs_rms{0}.pkl".format(self.iter_idx))
+            idx_labels = ['']
+            if self.args.save_intermediate_models:
+                idx_labels.append(int(self.iter_idx))
+
+            for idx_label in idx_labels:
+
+                torch.save(self.policy.actor_critic, os.path.join(save_path, f"policy{idx_label}.pt"))
+
+                # save normalisation params of envs
+                if self.args.norm_rew_for_policy:
+                    rew_rms = self.envs.venv.ret_rms
+                    utl.save_obj(rew_rms, save_path, f"env_rew_rms{idx_label}")
+                if self.args.norm_obs_for_policy:
+                    obs_rms = self.envs.venv.obs_rms
+                    utl.save_obj(obs_rms, save_path, f"env_obs_rms{idx_label}")
 
         # --- log some other things ---
 
@@ -352,6 +361,6 @@ class Learner:
             param_mean = np.mean([param_list[i].data.cpu().numpy().mean() for i in range(len(param_list))])
             param_grad_mean = np.mean([param_list[i].grad.cpu().numpy().mean() for i in range(len(param_list))])
             self.logger.add('weights/policy', param_mean, self.iter_idx)
-            self.logger.add('weights/policy_std', param_list[0].data.mean(), self.iter_idx)
+            self.logger.add('weights/policy_std', param_list[0].data.cpu().mean(), self.iter_idx)
             self.logger.add('gradients/policy', param_grad_mean, self.iter_idx)
-            self.logger.add('gradients/policy_std', param_list[0].grad.mean(), self.iter_idx)
+            self.logger.add('gradients/policy_std', param_list[0].grad.cpu().numpy().mean(), self.iter_idx)

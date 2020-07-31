@@ -151,6 +151,9 @@ class MetaLearner:
         self.policy_storage.prev_obs_normalised[0].copy_(prev_obs_normalised)
         self.policy_storage.to(device)
 
+        # log once before training
+        self.log(None, None, start_time)
+
         vae_is_pretrained = False
         for self.iter_idx in range(self.args.num_updates):
 
@@ -400,24 +403,30 @@ class MetaLearner:
             save_path = os.path.join(self.logger.full_output_folder, 'models')
             if not os.path.exists(save_path):
                 os.mkdir(save_path)
-            torch.save(self.policy.actor_critic, os.path.join(save_path, "policy{0}.pt".format(self.iter_idx)))
-            torch.save(self.vae.encoder, os.path.join(save_path, "encoder{0}.pt".format(self.iter_idx)))
-            if self.vae.state_decoder is not None:
-                torch.save(self.vae.state_decoder, os.path.join(save_path, "state_decoder{0}.pt".format(self.iter_idx)))
-            if self.vae.reward_decoder is not None:
-                torch.save(self.vae.reward_decoder,
-                           os.path.join(save_path, "reward_decoder{0}.pt".format(self.iter_idx)))
-            if self.vae.task_decoder is not None:
-                torch.save(self.vae.task_decoder, os.path.join(save_path, "task_decoder{0}.pt".format(self.iter_idx)))
 
-            # save normalisation params of envs
-            if self.args.norm_rew_for_policy:
-                # save rolling mean and std
-                rew_rms = self.envs.venv.ret_rms
-                utl.save_obj(rew_rms, save_path, "env_rew_rms{0}.pkl".format(self.iter_idx))
-            if self.args.norm_obs_for_policy:
-                obs_rms = self.envs.venv.obs_rms
-                utl.save_obj(obs_rms, save_path, "env_obs_rms{0}.pkl".format(self.iter_idx))
+            idx_labels = ['']
+            if self.args.save_intermediate_models:
+                idx_labels.append(int(self.iter_idx))
+
+            for idx_label in idx_labels:
+
+                torch.save(self.policy.actor_critic, os.path.join(save_path, f"policy{idx_label}.pt"))
+                torch.save(self.vae.encoder, os.path.join(save_path, f"encoder{idx_label}.pt"))
+                if self.vae.state_decoder is not None:
+                    torch.save(self.vae.state_decoder, os.path.join(save_path, f"state_decoder{idx_label}.pt"))
+                if self.vae.reward_decoder is not None:
+                    torch.save(self.vae.reward_decoder, os.path.join(save_path, f"reward_decoder{idx_label}.pt"))
+                if self.vae.task_decoder is not None:
+                    torch.save(self.vae.task_decoder, os.path.join(save_path, f"task_decoder{idx_label}.pt"))
+
+                # save normalisation params of envs
+                if self.args.norm_rew_for_policy:
+                    # save rolling mean and std
+                    rew_rms = self.envs.venv.ret_rms
+                    utl.save_obj(rew_rms, save_path, f"env_rew_rms{idx_label}")
+                if self.args.norm_obs_for_policy:
+                    obs_rms = self.envs.venv.obs_rms
+                    utl.save_obj(obs_rms, save_path, f"env_obs_rms{idx_label}")
 
         # --- log some other things ---
 
