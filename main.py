@@ -90,10 +90,11 @@ def main():
     if hasattr(args, 'decode_only_past') and args.decode_only_past:
         args.split_batches_by_elbo = True
 
-    # start training
-    all_seeds = args.seed
-    for seed in all_seeds:
+    seed_list = [args.seed] if isinstance(args.seed, int) else args.seed
+    for seed in seed_list:
+        print('training', seed)
         args.seed = seed
+
         if args.disable_metalearner:
             # If `disable_metalearner` is true, the file `learner.py` will be used instead of `metalearner.py`.
             # This is a stripped down version without encoder, decoder, stochastic latent variables, etc.
