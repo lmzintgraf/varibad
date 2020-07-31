@@ -84,8 +84,8 @@ def main():
     # clean up arguments
     if hasattr(args, 'disable_decoder') and args.disable_decoder:
         args.decode_reward = False
-    args.decode_state = False
-    args.decode_task = False
+        args.decode_state = False
+        args.decode_task = False
 
     if hasattr(args, 'decode_only_past') and args.decode_only_past:
         args.split_batches_by_elbo = True
