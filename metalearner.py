@@ -345,7 +345,6 @@ class MetaLearner:
         return policy_train_stats, None
 
     def log(self, run_stats, train_stats, start_time):
-        train_stats, meta_train_stats = train_stats
 
         # --- visualise behaviour of policy ---
 
@@ -430,7 +429,9 @@ class MetaLearner:
 
         # --- log some other things ---
 
-        if self.iter_idx % self.args.log_interval == 0:
+        if (self.iter_idx % self.args.log_interval == 0) and (train_stats is not None):
+
+            train_stats, _ = train_stats
 
             self.logger.add('policy_losses/value_loss', train_stats[0], self.iter_idx)
             self.logger.add('policy_losses/action_loss', train_stats[1], self.iter_idx)

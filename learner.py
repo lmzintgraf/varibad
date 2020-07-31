@@ -277,7 +277,6 @@ class Learner:
         """
         Evaluate policy, save model, write to tensorboard logger.
         """
-        train_stats, meta_train_stats = train_stats
 
         # --- visualise behaviour of policy ---
 
@@ -344,7 +343,10 @@ class Learner:
 
         # --- log some other things ---
 
-        if self.iter_idx % self.args.log_interval == 0:
+        if (self.iter_idx % self.args.log_interval == 0) and (train_stats is not None):
+
+            train_stats, _ = train_stats
+
             self.logger.add('policy_losses/value_loss', train_stats[0], self.iter_idx)
             self.logger.add('policy_losses/action_loss', train_stats[1], self.iter_idx)
             self.logger.add('policy_losses/dist_entropy', train_stats[2], self.iter_idx)

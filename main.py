@@ -21,7 +21,7 @@ from metalearner import MetaLearner
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env-type', default='cheetah_dir_oracle')
+    parser.add_argument('--env-type', default='cheetah_dir_varibad')
     args, rest_args = parser.parse_known_args()
     env = args.env_type
 
@@ -90,6 +90,7 @@ def main():
     if hasattr(args, 'decode_only_past') and args.decode_only_past:
         args.split_batches_by_elbo = True
 
+    # begin training (loop through all passed seeds)
     seed_list = [args.seed] if isinstance(args.seed, int) else args.seed
     for seed in seed_list:
         print('training', seed)
