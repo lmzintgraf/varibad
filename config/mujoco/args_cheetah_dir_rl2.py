@@ -14,13 +14,13 @@ def get_args(rest_args):
 
     # -- RL2 (things to change in VariBAD to get to RL2 setup) --
 
-    parser.add_argument('--disable_decoder', type=boolean_argument, default=False,
+    parser.add_argument('--disable_decoder', type=boolean_argument, default=True,
                         help='train without decoder')
     parser.add_argument('--add_nonlinearity_to_latent', type=boolean_argument, default=True,
                         help='Use relu before feeding latent to policy')
-    parser.add_argument('--rlloss_through_encoder', type=boolean_argument, default=False,
+    parser.add_argument('--rlloss_through_encoder', type=boolean_argument, default=True,
                         help='backprop rl loss through encoder')
-    parser.add_argument('--condition_policy_on_state', type=boolean_argument, default=True,
+    parser.add_argument('--condition_policy_on_state', type=boolean_argument, default=False,
                         help='after the encoder, concatenate env state and latent variable')
     parser.add_argument('--latent_dim', type=int, default=128, help='dimensionality of latent space')
 
