@@ -99,10 +99,10 @@ class DummyVecEnv(VecEnv):
             super().render(mode=mode)
 
     def get_task(self):
-        if self.num_envs == 1:
-            return self.envs[0].unwrapped.get_task()
-        else:
-            raise NotImplementedError
+        return self.envs[0].unwrapped.get_task()
+
+    def get_belief(self):
+        return self.envs[0].unwrapped.get_belief()
 
     def reset_task(self, task=None):
         if self.num_envs == 1:

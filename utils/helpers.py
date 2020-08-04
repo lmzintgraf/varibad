@@ -13,8 +13,26 @@ from torch.nn import functional as F
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-def env_step(envs, action):
-    next_obs, reward, done, infos = envs.step(action.detach())
+def reset_env(env, args, indices=None, state=None):
+    """ env can be many environments or just one """
+    # reset all environments
+    if (indices is None) or (len(indices) == args.num_processes):
+        state = env.reset().to(device)
+    # reset only the ones given by indices
+    else:
+        assert state is not None
+        for i in indices:
+            state[i] = env.reset(index=i)
+
+    belief = torch.from_numpy(env.get_belief()).to(device) if args.pass_belief_to_policy else None
+    task = torch.from_numpy(env.get_task()).to(device) if args.pass_task_to_policy else None
+        
+    return state, belief, task
+
+
+def env_step(env, action, args):
+
+    next_obs, reward, done, infos = env.step(action.detach())
 
     if isinstance(next_obs, list):
         next_obs = [o.to(device) for o in next_obs]
@@ -25,21 +43,22 @@ def env_step(envs, action):
     else:
         reward = reward.to(device)
 
-    return next_obs, reward, done, infos
+    belief = torch.from_numpy(env.get_belief()).to(device) if args.pass_belief_to_policy else None
+    task = torch.from_numpy(env.get_task()).to(device) if args.pass_task_to_policy else None
+
+    return [next_obs, belief, task], reward, done, infos
 
 
 def select_action(args,
                   policy,
-                  obs,
                   deterministic,
+                  state=None,
+                  belief=None,
+                  task=None,
                   latent_sample=None, latent_mean=None, latent_logvar=None):
-    """
-    Select action using the policy.
-    """
-
-    # augment the observation with the latent distribution
-    obs = get_augmented_obs(args, obs, latent_sample, latent_mean, latent_logvar)
-    action = policy.act(obs, deterministic)
+    """ Select action using the policy. """
+    latent = get_latent_for_policy(args=args, latent_sample=latent_sample, latent_mean=latent_mean, latent_logvar=latent_logvar)
+    action = policy.act(state=state, latent=latent, belief=belief, task=task, deterministic=deterministic)
     if isinstance(action, list) or isinstance(action, tuple):
         value, action, action_log_prob = action
     else:
@@ -49,31 +68,25 @@ def select_action(args,
     return value, action, action_log_prob
 
 
-def get_augmented_obs(args, obs,
-                      latent_sample=None, latent_mean=None, latent_logvar=None):
-    obs_augmented = obs.clone()
+def get_latent_for_policy(args, latent_sample=None, latent_mean=None, latent_logvar=None):
 
-    if latent_sample is None:
-        sample_embeddings = False
-    else:
-        sample_embeddings = args.sample_embeddings
+    if (latent_sample is None) and (latent_mean is None) and (latent_logvar is None):
+        return None
 
-    if (not args.disable_metalearner) and (not args.condition_policy_on_state):
-        obs_augmented = torch.zeros(0, ).to(device)
-
-    if (not args.disable_metalearner) and args.add_nonlinearity_to_latent:
+    if args.add_nonlinearity_to_latent:
+        latent_sample = F.relu(latent_sample)
         latent_mean = F.relu(latent_mean)
         latent_logvar = F.relu(latent_logvar)
 
-    if sample_embeddings and (latent_sample is not None):
-        latent_sample = latent_sample.reshape((-1, latent_sample.shape[-1]))
-        obs_augmented = torch.cat((obs_augmented, latent_sample), dim=-1)
-    elif (latent_mean is not None) and (latent_logvar is not None):
-        latent_mean = latent_mean.reshape((-1, latent_mean.shape[-1]))
-        latent_logvar = latent_logvar.reshape((-1, latent_logvar.shape[-1]))
-        obs_augmented = torch.cat((obs_augmented, latent_mean, latent_logvar), dim=-1)
+    if args.sample_embeddings:
+        latent = latent_sample
+    else:
+        latent = torch.cat((latent_mean, latent_logvar), dim=-1)
 
-    return obs_augmented
+    if latent.shape[0] == 1:
+        latent = latent.squeeze(0)
+
+    return latent
 
 
 def update_encoding(encoder, next_obs, action, reward, done, hidden_state):
@@ -135,11 +148,10 @@ def recompute_embeddings(
     h = policy_storage.hidden_states[0].detach()
     for i in range(policy_storage.actions.shape[0]):
         # reset hidden state of the GRU when we reset the task
-        reset_task = policy_storage.done[i + 1]
-        h = encoder.reset_hidden(h, reset_task)
+        h = encoder.reset_hidden(h, policy_storage.done[i + 1])
 
         ts, tm, tl, h = encoder(policy_storage.actions.float()[i:i + 1],
-                                policy_storage.next_obs_raw[i:i + 1],
+                                policy_storage.next_state[i:i + 1],
                                 policy_storage.rewards_raw[i:i + 1],
                                 h,
                                 sample=sample,

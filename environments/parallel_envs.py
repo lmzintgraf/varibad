@@ -26,11 +26,9 @@ def make_env(env_id, seed, rank, episodes_per_task, **kwargs):
 
 def make_vec_envs(env_name, seed, num_processes, gamma,
                   device, episodes_per_task,
-                  normalise_obs, normalise_rew,
-                  obs_rms, ret_rms, rank_offset=0,
+                  normalise_rew, ret_rms, rank_offset=0,
                   **kwargs):
     """
-    :param obs_rms: running mean and std for observations
     :param ret_rms: running return and std for rewards
     """
     envs = [make_env(env_id=env_name, seed=seed, rank=rank_offset + i,
@@ -44,11 +42,9 @@ def make_vec_envs(env_name, seed, num_processes, gamma,
 
     if len(envs.observation_space.shape) == 1:
         if gamma is None:
-            envs = VecNormalize(envs, normalise_obs=normalise_obs, normalise_rew=normalise_rew, obs_rms=obs_rms,
-                                ret_rms=ret_rms)
+            envs = VecNormalize(envs, normalise_rew=normalise_rew, ret_rms=ret_rms)
         else:
-            envs = VecNormalize(envs, normalise_obs=normalise_obs, normalise_rew=normalise_rew, obs_rms=obs_rms,
-                                ret_rms=ret_rms, gamma=gamma)
+            envs = VecNormalize(envs, normalise_rew=normalise_rew, ret_rms=ret_rms, gamma=gamma)
 
     envs = VecPyTorch(envs, device)
 
@@ -81,7 +77,8 @@ class VecPyTorch(VecEnvWrapper):
         return obs
 
     def step_async(self, actions):
-        actions = actions.squeeze(1).cpu().numpy()
+        # actions = actions.squeeze(1).cpu().numpy()
+        actions = actions.cpu().numpy()
         self.venv.step_async(actions)
 
     def step_wait(self):
@@ -99,7 +96,7 @@ class VecPyTorch(VecEnvWrapper):
     def __getattr__(self, attr):
         """ If env does not have the attribute then call the attribute in the wrapped_env """
 
-        if attr in ['num_states', '_max_episode_steps']:
+        if attr in ['_max_episode_steps', 'task_dim', 'belief_dim', 'num_states']:
             return self.unwrapped.get_env_attr(attr)
 
         try:

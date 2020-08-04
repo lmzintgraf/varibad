@@ -5,6 +5,8 @@ from gym.envs.registration import load
 
 from environments.mujoco import rand_param_envs
 
+gym.logger.set_level(40)  # this is to suppress some warnings
+
 
 def mujoco_wrapper(entry_point, **kwargs):
     # Load the environment from its entry point
@@ -26,6 +28,16 @@ class VariBadWrapper(gym.Wrapper):
         """
 
         super().__init__(env)
+
+        # make sure we can call these attributes even if the orig env does not have them
+        if not hasattr(self.env.unwrapped, 'task_dim'):
+            self.env.unwrapped.task_dim = 0
+        if not hasattr(self.env.unwrapped, 'belief_dim'):
+            self.env.unwrapped.belief_dim = 0
+        if not hasattr(self.env.unwrapped, 'get_belief'):
+            self.env.unwrapped.get_belief = lambda: None
+        if not hasattr(self.env.unwrapped, 'num_states'):
+            self.env.unwrapped.num_states = None
 
         if episodes_per_task > 1:
             self.add_done_info = True

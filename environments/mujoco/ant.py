@@ -65,7 +65,6 @@ class AntEnv(MujocoEnv):
         if task is None:
             task = self.sample_tasks(1)[0]
         self.set_task(task)
-        # self.reset()
 
     @staticmethod
     def visualise_behaviour(env,
@@ -102,10 +101,8 @@ class AntEnv(MujocoEnv):
 
         # (re)set environment
         env.reset_task()
-        (obs_raw, obs_normalised) = env.reset()
-        obs_raw = obs_raw.float().reshape((1, -1)).to(device)
-        obs_normalised = obs_normalised.float().reshape((1, -1)).to(device)
-        start_obs_raw = obs_raw.clone()
+        state = env.reset().float().reshape((1, -1)).to(device)
+        start_obs_raw = state.clone()
 
         # initialise actions and rewards (used as initial input to policy if we have a recurrent policy)
         if hasattr(args, 'hidden_size'):
@@ -143,17 +140,16 @@ class AntEnv(MujocoEnv):
                 if step_idx == 1:
                     episode_prev_obs[episode_idx].append(start_obs_raw.clone())
                 else:
-                    episode_prev_obs[episode_idx].append(obs_raw.clone())
+                    episode_prev_obs[episode_idx].append(state.clone())
                 # act
-                o_aug = utl.get_augmented_obs(args,
-                                              obs_normalised if args.norm_obs_for_policy else obs_raw,
-                                              curr_latent_sample, curr_latent_mean,
-                                              curr_latent_logvar)
+                o_aug = utl.get_latent_for_policy(args,
+                                                  latent_sample=curr_latent_sample,
+                                                  latent_mean=curr_latent_mean,
+                                                  latent_logvar=curr_latent_logvar)
                 _, action, _ = policy.act(o_aug, deterministic=True)
 
-                (obs_raw, obs_normalised), (rew_raw, rew_normalised), done, info = env.step(action.cpu().detach())
-                obs_raw = obs_raw.float().reshape((1, -1)).to(device)
-                obs_normalised = obs_normalised.float().reshape((1, -1)).to(device)
+                state, (rew_raw, rew_normalised), done, info = env.step(action.cpu().detach())
+                state = state.float().reshape((1, -1)).to(device)
 
                 # keep track of position
                 pos[episode_idx].append(unwrapped_env.get_body_com("torso")[:2].copy())
@@ -162,7 +158,7 @@ class AntEnv(MujocoEnv):
                     # update task embedding
                     curr_latent_sample, curr_latent_mean, curr_latent_logvar, hidden_state = encoder(
                         action.float().to(device),
-                        obs_raw,
+                        state,
                         rew_raw.reshape((1, 1)).float().to(device),
                         hidden_state,
                         return_prior=False)
@@ -171,7 +167,7 @@ class AntEnv(MujocoEnv):
                     episode_latent_means[episode_idx].append(curr_latent_mean[0].clone())
                     episode_latent_logvars[episode_idx].append(curr_latent_logvar[0].clone())
 
-                episode_next_obs[episode_idx].append(obs_raw.clone())
+                episode_next_obs[episode_idx].append(state.clone())
                 episode_rewards[episode_idx].append(rew_raw.clone())
                 episode_actions[episode_idx].append(action.clone())
 

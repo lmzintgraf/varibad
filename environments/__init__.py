@@ -59,52 +59,6 @@ register(
     max_episode_steps=200
 )
 
-# Mujoco // Oracles
-# ----------------------------------------
-
-register(
-    'HalfCheetahDirOracle-v0',
-    entry_point='environments.wrappers:mujoco_wrapper',
-    kwargs={'entry_point': 'environments.mujoco.half_cheetah_dir:HalfCheetahDirOracleEnv',
-            'max_episode_steps': 200},
-    max_episode_steps=200
-)
-
-register(
-    'HalfCheetahVelOracle-v0',
-    entry_point='environments.wrappers:mujoco_wrapper',
-    kwargs={'entry_point': 'environments.mujoco.half_cheetah_vel:HalfCheetahRandVelOracleEnv',
-            'max_episode_steps': 200},
-    max_episode_steps=200
-)
-
-register(
-    'AntGoalOracle-v0',
-    entry_point='environments.wrappers:mujoco_wrapper',
-    kwargs={'entry_point': 'environments.mujoco.ant_goal:AntGoalOracleEnv',
-            'max_episode_steps': 200},
-    max_episode_steps=200
-)
-
-register(
-    'AntDirOracle-v0',
-    entry_point='environments.wrappers:mujoco_wrapper',
-    kwargs={'entry_point': 'environments.mujoco.ant_dir:AntDirOracleEnv',
-            'max_episode_steps': 200},
-    max_episode_steps=200
-)
-
-register(
-    id='Walker2DRandParamsOracle-v0',
-    entry_point='environments.mujoco.rand_param_envs.walker2d_rand_params:Walker2DRandParamsOracleEnv',
-    max_episode_steps=200
-)
-
-register(
-    id='HopperRandParamsOracle-v0',
-    entry_point='environments.mujoco.rand_param_envs.hopper_rand_params:HopperRandParamsOracleEnv',
-    max_episode_steps=200
-)
 
 # # 2D Navigation
 # # ----------------------------------------
@@ -122,19 +76,6 @@ register(
     kwargs={'max_episode_steps': 100},
     max_episode_steps=100,
 )
-#
-register(
-    'PointEnvOracle-v0',
-    entry_point='environments.navigation.point_robot:PointEnvOracle',
-    kwargs={'max_episode_steps': 100},
-    max_episode_steps=100,
-)
-register(
-    'SparsePointEnvOracle-v0',
-    entry_point='environments.navigation.point_robot:SparsePointEnvOracle',
-    kwargs={'max_episode_steps': 100},
-    max_episode_steps=100,
-)
 
 #
 # # GridWorld
@@ -144,20 +85,4 @@ register(
     'GridNavi-v0',
     entry_point='environments.navigation.gridworld:GridNavi',
     kwargs={'num_cells': 5, 'num_steps': 15},
-)
-
-# Oracles
-
-register(
-    'GridNaviOracle-v0',
-    entry_point='environments.navigation.gridworld:GridNavi',
-    kwargs={'oracle': True},
-)
-
-# Belief Oracle
-
-register(
-    'GridNaviBeliefOracle-v0',
-    entry_point='environments.navigation.gridworld:GridNavi',
-    kwargs={'belief_oracle': True},
 )

@@ -71,10 +71,10 @@ class HalfCheetahEnv(HalfCheetahEnv_):
 
         # (re)set environment
         env.reset_task()
-        (obs_raw, obs_normalised) = env.reset()
-        obs_raw = obs_raw.float().reshape((1, -1)).to(device)
-        obs_normalised = obs_normalised.float().reshape((1, -1)).to(device)
-        start_obs_raw = obs_raw.clone()
+
+        # state = env.reset().reshape((1, -1)).float().to(device)
+        state, belief, task = utl.reset_env(env, args)
+        start_state = state.clone()
 
         # initialise actions and rewards (used as initial input to policy if we have a recurrent policy)
         if hasattr(args, 'hidden_size'):
@@ -83,7 +83,6 @@ class HalfCheetahEnv(HalfCheetahEnv_):
             hidden_state = None
 
         # keep track of what task we're in and the position of the cheetah
-        task = env.get_task()
         pos = [[] for _ in range(args.max_rollouts_per_task)]
         start_pos = unwrapped_env.get_body_com("torso")[0].copy()
 
@@ -110,19 +109,18 @@ class HalfCheetahEnv(HalfCheetahEnv_):
             for step_idx in range(1, env._max_episode_steps + 1):
 
                 if step_idx == 1:
-                    episode_prev_obs[episode_idx].append(start_obs_raw.clone())
+                    episode_prev_obs[episode_idx].append(start_state.clone())
                 else:
-                    episode_prev_obs[episode_idx].append(obs_raw.clone())
+                    episode_prev_obs[episode_idx].append(state.clone())
                 # act
-                o_aug = utl.get_augmented_obs(args,
-                                              obs_normalised if args.norm_obs_for_policy else obs_raw,
-                                              curr_latent_sample, curr_latent_mean,
-                                              curr_latent_logvar)
-                _, action, _ = policy.act(o_aug, deterministic=True)
+                latent = utl.get_latent_for_policy(args,
+                                                   latent_sample=curr_latent_sample,
+                                                   latent_mean=curr_latent_mean,
+                                                   latent_logvar=curr_latent_logvar)
+                _, action, _ = policy.act(state=state.view(-1), latent=latent, belief=belief, task=task, deterministic=True)
 
-                (obs_raw, obs_normalised), (rew_raw, rew_normalised), done, info = env.step(action.cpu().detach())
-                obs_raw = obs_raw.float().reshape((1, -1)).to(device)
-                obs_normalised = obs_normalised.float().reshape((1, -1)).to(device)
+                state, (rew, rew_normalised), done, info = env.step(action.cpu().detach())
+                state = state.reshape((1, -1)).float().to(device)
 
                 # keep track of position
                 pos[episode_idx].append(unwrapped_env.get_body_com("torso")[0].copy())
@@ -130,23 +128,20 @@ class HalfCheetahEnv(HalfCheetahEnv_):
                 if encoder is not None:
                     # update task embedding
                     curr_latent_sample, curr_latent_mean, curr_latent_logvar, hidden_state = encoder(
-                        action.float().to(device),
-                        obs_raw,
-                        rew_raw.reshape((1, 1)).float().to(device),
-                        hidden_state,
-                        return_prior=False)
+                        action.reshape(1, -1).float().to(device), state, rew.reshape(1, -1).float().to(device),
+                        hidden_state, return_prior=False)
 
                     episode_latent_samples[episode_idx].append(curr_latent_sample[0].clone())
                     episode_latent_means[episode_idx].append(curr_latent_mean[0].clone())
                     episode_latent_logvars[episode_idx].append(curr_latent_logvar[0].clone())
 
-                episode_next_obs[episode_idx].append(obs_raw.clone())
-                episode_rewards[episode_idx].append(rew_raw.clone())
-                episode_actions[episode_idx].append(action.clone())
+                episode_next_obs[episode_idx].append(state.clone())
+                episode_rewards[episode_idx].append(rew.clone())
+                episode_actions[episode_idx].append(action.reshape(1, -1).clone())
 
                 if info[0]['done_mdp'] and not done:
-                    start_obs_raw = info[0]['start_state']
-                    start_obs_raw = torch.from_numpy(start_obs_raw).float().reshape((1, -1)).to(device)
+                    start_state = info[0]['start_state']
+                    start_state = torch.from_numpy(start_state).reshape((1, -1)).float().to(device)
                     start_pos = unwrapped_env.get_body_com("torso")[0].copy()
                     break
 

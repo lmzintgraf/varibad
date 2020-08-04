@@ -31,7 +31,13 @@ def worker(remote, parent_remote, env_fn_wrapper):
             elif cmd == 'get_spaces':
                 remote.send((env.observation_space, env.action_space))
             elif cmd == 'get_task':
-                remote.send(env.unwrapped.get_task())
+                remote.send(env.get_task())
+            elif cmd == 'task_dim':
+                remote.send(env.task_dim)
+            elif cmd == 'get_belief':
+                remote.send(env.get_belief())
+            elif cmd == 'belief_dim':
+                remote.send(env.belief_dim)
             elif cmd == 'reset_task':
                 env.unwrapped.reset_task()
             else:
@@ -114,3 +120,15 @@ class SubprocVecEnv(VecEnv):
     def get_env_attr(self, attr):
         self.remotes[0].send((attr, None))
         return self.remotes[0].recv()
+
+    def get_task(self):
+        self._assert_not_closed()
+        for remote in self.remotes:
+            remote.send(('get_task', None))
+        return np.stack([remote.recv() for remote in self.remotes])
+
+    def get_belief(self):
+        self._assert_not_closed()
+        for remote in self.remotes:
+            remote.send(('get_belief', None))
+        return np.stack([remote.recv() for remote in self.remotes])

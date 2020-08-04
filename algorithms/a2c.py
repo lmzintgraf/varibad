@@ -18,7 +18,6 @@ class A2C:
                  optimiser_vae=None,
                  lr=None,
                  eps=None,
-                 alpha=None,
                  ):
 
         # the model
@@ -32,7 +31,7 @@ class A2C:
         if policy_optimiser == 'adam':
             self.optimiser = optim.Adam(actor_critic.parameters(), lr=lr, eps=eps)
         elif policy_optimiser == 'rmsprop':
-            self.optimiser = optim.RMSprop(actor_critic.parameters(), lr, eps=eps, alpha=alpha)
+            self.optimiser = optim.RMSprop(actor_critic.parameters(), lr, eps=eps, alpha=0.99)
         self.optimiser_vae = optimiser_vae
 
         if policy_anneal_lr:
@@ -49,7 +48,7 @@ class A2C:
                compute_vae_loss=None  # function that can compute the VAE loss
                ):
 
-        # -- get action values --
+        # get action values
         advantages = policy_storage.returns[:-1] - policy_storage.value_preds[:-1]
 
         if rlloss_through_encoder:
@@ -57,27 +56,31 @@ class A2C:
             utl.recompute_embeddings(policy_storage, encoder, sample=False, update_idx=0,
                                      detach_every=args.tbptt_stepsize if hasattr(args, 'tbptt_stepsize') else None)
 
+        # update the normalisation parameters of policy inputs before updating
+        self.actor_critic.policy.update_rms(policy_storage=policy_storage)
+
         data_generator = policy_storage.feed_forward_generator(advantages, 1)
         for sample in data_generator:
 
-            obs_batch, actions_batch, latent_sample_batch, latent_mean_batch, latent_logvar_batch, value_preds_batch, \
+            state_batch, belief_batch, task_batch, \
+            actions_batch, latent_sample_batch, latent_mean_batch, latent_logvar_batch, value_preds_batch, \
             return_batch, old_action_log_probs_batch, adv_targ = sample
 
             if not rlloss_through_encoder:
-                obs_batch = obs_batch.detach()
+                state_batch = state_batch.detach()
                 if latent_sample_batch is not None:
                     latent_sample_batch = latent_sample_batch.detach()
                     latent_mean_batch = latent_mean_batch.detach()
                     latent_logvar_batch = latent_logvar_batch.detach()
 
-            obs_aug = utl.get_augmented_obs(args=args,
-                                            obs=obs_batch,
-                                            latent_sample=latent_sample_batch, latent_mean=latent_mean_batch,
-                                            latent_logvar=latent_logvar_batch
-                                            )
+            latent_batch = utl.get_latent_for_policy(args=args, latent_sample=latent_sample_batch,
+                                                     latent_mean=latent_mean_batch, latent_logvar=latent_logvar_batch
+                                                     )
 
             values, action_log_probs, dist_entropy, action_mean, action_logstd = \
-                self.actor_critic.evaluate_actions(obs_aug, actions_batch, return_action_mean=True, update_rms=True)
+                self.actor_critic.evaluate_actions(state=state_batch, latent=latent_batch,
+                                                   belief=belief_batch,  task=task_batch,
+                                                   action=actions_batch, return_action_mean=True)
 
             # --  UPDATE --
 
@@ -114,5 +117,5 @@ class A2C:
 
         return value_loss, action_loss, dist_entropy, loss
 
-    def act(self, obs, deterministic=False):
-        return self.actor_critic.act(obs, deterministic=deterministic)
+    def act(self, state, latent, belief, task, deterministic=False):
+        return self.actor_critic.act(state=state, latent=latent, belief=belief, task=task, deterministic=deterministic)

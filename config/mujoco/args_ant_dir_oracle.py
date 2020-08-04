@@ -27,7 +27,7 @@ def get_args(rest_args):
                         help='normalise env observations (for policy)')
     parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=True,
                         help='normalise env rewards (for policy)')
-    parser.add_argument('--normalise_actions', type=boolean_argument, default=False, help='output normalised actions')
+    parser.add_argument('--norm_actions_of_policy', type=boolean_argument, default=False, help='output normalised actions')
 
     # --- POLICY ---
 

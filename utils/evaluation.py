@@ -10,7 +10,6 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def evaluate(args,
              policy,
-             obs_rms,
              ret_rms,
              iter_idx,
              encoder=None,
@@ -39,14 +38,11 @@ def evaluate(args,
                          device=device,
                          rank_offset=num_processes + 1,  # to use diff tmp folders than main processes
                          episodes_per_task=num_episodes,
-                         normalise_obs=args.norm_obs_for_policy, normalise_rew=args.norm_rew_for_policy,
-                         obs_rms=obs_rms, ret_rms=ret_rms)
+                         normalise_rew=args.norm_rew_for_policy, ret_rms=ret_rms)
     num_steps = envs._max_episode_steps
 
     # reset environments
-    (obs_raw, obs_normalised) = envs.reset()
-    obs_raw = obs_raw.to(device)
-    obs_normalised = obs_normalised.to(device)
+    state, belief, task = utl.reset_env(envs, args)
 
     # this counts how often an agent has done the same task already
     task_count = torch.zeros(num_processes).long().to(device)
@@ -64,20 +60,22 @@ def evaluate(args,
             with torch.no_grad():
                 _, action, _ = utl.select_action(args=args,
                                                  policy=policy,
-                                                 obs=obs_normalised if args.norm_obs_for_policy else obs_raw,
+                                                 state=state,
+                                                 belief=belief,
+                                                 task=task,
                                                  latent_sample=latent_sample,
                                                  latent_mean=latent_mean,
                                                  latent_logvar=latent_logvar,
                                                  deterministic=True)
 
             # observe reward and next obs
-            (obs_raw, obs_normalised), (rew_raw, rew_normalised), done, infos = utl.env_step(envs, action)
+            [state, belief, task], (rew_raw, rew_normalised), done, infos = utl.env_step(envs, action, args)
             done_mdp = [info['done_mdp'] for info in infos]
 
             if encoder is not None:
                 # update the hidden state
                 latent_sample, latent_mean, latent_logvar, hidden_state = utl.update_encoding(encoder=encoder,
-                                                                                              next_obs=obs_raw,
+                                                                                              next_obs=state,
                                                                                               action=action,
                                                                                               reward=rew_raw,
                                                                                               done=None,
@@ -89,8 +87,8 @@ def evaluate(args,
             for i in np.argwhere(done_mdp).flatten():
                 # count task up, but cap at num_episodes + 1
                 task_count[i] = min(task_count[i] + 1, num_episodes)  # zero-indexed, so no +1
-            for i in np.argwhere(done).flatten():
-                [obs_raw[i], obs_normalised[i]] = envs.reset(index=i)
+            if np.sum(done) > 0:
+                state, belief, task = utl.reset_env(envs, args, done, state)
 
     envs.close()
 
@@ -101,7 +99,7 @@ def visualise_behaviour(args,
                         policy,
                         image_folder,
                         iter_idx,
-                        obs_rms, ret_rms,
+                        ret_rms,
                         encoder=None,
                         reward_decoder=None,
                         state_decoder=None,
@@ -118,8 +116,7 @@ def visualise_behaviour(args,
                         gamma=args.policy_gamma,
                         device=device,
                         episodes_per_task=args.max_rollouts_per_task,
-                        normalise_obs=args.norm_obs_for_policy, normalise_rew=args.norm_rew_for_policy,
-                        obs_rms=obs_rms, ret_rms=ret_rms,
+                        normalise_rew=args.norm_rew_for_policy, ret_rms=ret_rms,
                         rank_offset=args.num_processes + 42,  # not sure if the temp folders would otherwise clash
                         )
     episode_task = torch.from_numpy(np.array(env.get_task())).to(device).float()
@@ -198,9 +195,7 @@ def get_test_rollout(args, env, policy, encoder=None):
     # --- roll out policy ---
 
     # (re)set environment
-    [obs_raw, obs_normalised] = env.reset()
-    obs_raw = obs_raw.reshape((1, -1)).to(device)
-    obs_normalised = obs_normalised.reshape((1, -1)).to(device)
+    state = env.reset().reshape((1, -1)).to(device)
 
     for episode_idx in range(num_episodes):
 
@@ -220,25 +215,24 @@ def get_test_rollout(args, env, policy, encoder=None):
 
         for step_idx in range(1, env._max_episode_steps + 1):
 
-            episode_prev_obs[episode_idx].append(obs_raw.clone())
+            episode_prev_obs[episode_idx].append(state.clone())
 
             _, action, _ = utl.select_action(args=args,
                                              policy=policy,
-                                             obs=obs_normalised if args.norm_obs_for_policy else obs_raw,
+                                             state=state,
                                              deterministic=True,
                                              latent_sample=curr_latent_sample, latent_mean=curr_latent_mean,
                                              latent_logvar=curr_latent_logvar)
 
             # observe reward and next obs
-            (obs_raw, obs_normalised), (rew_raw, rew_normalised), done, infos = utl.env_step(env, action)
-            obs_raw = obs_raw.reshape((1, -1)).to(device)
-            obs_normalised = obs_normalised.reshape((1, -1)).to(device)
+            state, (rew_raw, rew_normalised), done, infos = utl.env_step(env, action)
+            state = state.reshape((1, -1)).to(device)
 
             if encoder is not None:
                 # update task embedding
                 curr_latent_sample, curr_latent_mean, curr_latent_logvar, hidden_state = encoder(
                     action.float().to(device),
-                    obs_raw,
+                    state,
                     rew_raw.reshape((1, 1)).float().to(device),
                     hidden_state,
                     return_prior=False)
@@ -247,7 +241,7 @@ def get_test_rollout(args, env, policy, encoder=None):
                 episode_latent_means[episode_idx].append(curr_latent_mean[0].clone())
                 episode_latent_logvars[episode_idx].append(curr_latent_logvar[0].clone())
 
-            episode_next_obs[episode_idx].append(obs_raw.clone())
+            episode_next_obs[episode_idx].append(state.clone())
             episode_rewards[episode_idx].append(rew_raw.clone())
             episode_actions[episode_idx].append(action.clone())
 

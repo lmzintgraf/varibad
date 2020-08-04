@@ -13,28 +13,38 @@ def get_args(rest_args):
     parser.add_argument('--num_frames', type=int, default=1e8, help='number of frames to train')
     parser.add_argument('--max_rollouts_per_task', type=int, default=4)
     parser.add_argument('--exp_label', default='belief_oracle', help='label for the experiment')
-    parser.add_argument('--env_name', default='GridNaviBeliefOracle-v0', help='environment to train on')
+    parser.add_argument('--env_name', default='GridNavi-v0', help='environment to train on')
 
     parser.add_argument('--disable_metalearner', type=boolean_argument, default=True,
                         help='Train a normal policy without the variBAD architecture')
 
     # --- POLICY ---
 
-    # normalising things
-    parser.add_argument('--norm_obs_for_policy', type=boolean_argument, default=False)
-    parser.add_argument('--norm_latents_for_policy', type=boolean_argument, default=False)
-    parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=False)
-    parser.add_argument('--normalise_actions', type=boolean_argument, default=False, help='normalise policy output')
+    # what to pass to the policy (note this is after the encoder)
+    parser.add_argument('--pass_state_to_policy', type=boolean_argument, default=True, help='condition policy on state')
+    parser.add_argument('--pass_latent_to_policy', type=boolean_argument, default=False, help='condition policy on VAE latent')
+    parser.add_argument('--pass_belief_to_policy', type=boolean_argument, default=True, help='condition policy on ground-truth belief')
+    parser.add_argument('--pass_task_to_policy', type=boolean_argument, default=False, help='condition policy on ground-truth task description')
+
+    # using separate encoders for the different inputs ("None" uses no encoder)
+    parser.add_argument('--policy_state_embedding_dim', type=int, default=16)
+    parser.add_argument('--policy_latent_embedding_dim', type=int, default=None)
+    parser.add_argument('--policy_belief_embedding_dim', type=int, default=16)
+    parser.add_argument('--policy_task_embedding_dim', type=int, default=None)
+
+    # normalising (inputs/rewards/outputs)
+    parser.add_argument('--norm_state_for_policy', type=boolean_argument, default=True, help='normalise state input')
+    parser.add_argument('--norm_latent_for_policy', type=boolean_argument, default=True, help='normalise latent input')
+    parser.add_argument('--norm_belief_for_policy', type=boolean_argument, default=True, help='normalise belief input')
+    parser.add_argument('--norm_task_for_policy', type=boolean_argument, default=True, help='normalise task input')
+    parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=True, help='normalise rew for RL train')
+    parser.add_argument('--norm_actions_of_policy', type=boolean_argument, default=False, help='normalise policy output')
 
     # network
-    parser.add_argument('--policy_layers', nargs='+', default=[32])
+    parser.add_argument('--policy_layers', nargs='+', default=[32, 32])
     parser.add_argument('--policy_activation_function', type=str, default='tanh', help='tanh/relu/leaky-relu')
     parser.add_argument('--policy_initialisation', type=str, default='normc', help='normc/orthogonal')
     parser.add_argument('--policy_anneal_lr', type=boolean_argument, default=False)
-
-    # belief oracle additions (embedding task specification and state separately before passing to network)
-    parser.add_argument('--latent_dim', type=int, default=32)
-    parser.add_argument('--state_embedding_size', type=int, default=32)
 
     # RL algorithm
     parser.add_argument('--policy', type=str, default='a2c', help='choose: a2c, ppo')
@@ -47,11 +57,8 @@ def get_args(rest_args):
     parser.add_argument('--ppo_use_clipped_value_loss', type=boolean_argument, default=True, help='clip value loss')
     parser.add_argument('--ppo_clip_param', type=float, default=0.05, help='clamp param')
 
-    # A2C specific
-    parser.add_argument('--a2c_alpha', type=float, default=0.99, help='RMSprop optimizer alpha (default: 0.99)')
-
     # other hyperparameters
-    parser.add_argument('--lr_policy', type=float, default=0.0007, help='learning rate (default: 7e-4)')
+    parser.add_argument('--lr_policy', type=float, default=7e-4, help='learning rate (default: 7e-4)')
     parser.add_argument('--num_processes', type=int, default=16,
                         help='how many training CPU processes / parallel environments to use (default: 16)')
     parser.add_argument('--policy_num_steps', type=int, default=30,

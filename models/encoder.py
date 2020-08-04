@@ -83,13 +83,14 @@ class RNNEncoder(nn.Module):
             mu = mu.repeat(num, 1)
             return eps.mul(std).add_(mu)
 
-    def reset_hidden(self, hidden_state, reset_task):
-        if hidden_state.dim() != reset_task.dim():
-            if reset_task.dim() == 2:
-                reset_task = reset_task.unsqueeze(0)
-            elif reset_task.dim() == 1:
-                reset_task = reset_task.unsqueeze(0).unsqueeze(2)
-        hidden_state = hidden_state * (1 - reset_task)
+    def reset_hidden(self, hidden_state, done):
+        """ Reset the hidden state where the BAMDP was done (i.e., we get a new task) """
+        if hidden_state.dim() != done.dim():
+            if done.dim() == 2:
+                done = done.unsqueeze(0)
+            elif done.dim() == 1:
+                done = done.unsqueeze(0).unsqueeze(2)
+        hidden_state = hidden_state * (1 - done)
         return hidden_state
 
     def prior(self, batch_size, sample=True):

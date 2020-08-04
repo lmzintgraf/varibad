@@ -14,11 +14,25 @@ def get_args(rest_args):
 
     # --- POLICY ---
 
-    # normalising things
-    parser.add_argument('--norm_obs_for_policy', type=boolean_argument, default=False)
-    parser.add_argument('--norm_latents_for_policy', type=boolean_argument, default=False)
-    parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=False)
-    parser.add_argument('--normalise_actions', type=boolean_argument, default=False, help='normalise policy output')
+    # what to pass to the policy (note this is after the encoder)
+    parser.add_argument('--pass_state_to_policy', type=boolean_argument, default=True, help='condition policy on state')
+    parser.add_argument('--pass_latent_to_policy', type=boolean_argument, default=True, help='condition policy on VAE latent')
+    parser.add_argument('--pass_belief_to_policy', type=boolean_argument, default=False, help='condition policy on ground-truth belief')
+    parser.add_argument('--pass_task_to_policy', type=boolean_argument, default=False, help='condition policy on ground-truth task description')
+
+    # using separate encoders for the different inputs ("None" uses no encoder)
+    parser.add_argument('--policy_state_embedding_dim', type=int, default=16)
+    parser.add_argument('--policy_latent_embedding_dim', type=int, default=16)
+    parser.add_argument('--policy_belief_embedding_dim', type=int, default=None)
+    parser.add_argument('--policy_task_embedding_dim', type=int, default=None)
+
+    # normalising (inputs/rewards/outputs)
+    parser.add_argument('--norm_state_for_policy', type=boolean_argument, default=True, help='normalise state input')
+    parser.add_argument('--norm_latent_for_policy', type=boolean_argument, default=True, help='normalise latent input')
+    parser.add_argument('--norm_belief_for_policy', type=boolean_argument, default=True, help='normalise belief input')
+    parser.add_argument('--norm_task_for_policy', type=boolean_argument, default=True, help='normalise task input')
+    parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=False, help='normalise rew for RL train')
+    parser.add_argument('--norm_actions_of_policy', type=boolean_argument, default=False, help='normalise policy output')
 
     # network
     parser.add_argument('--policy_layers', nargs='+', default=[32, 32])
@@ -36,9 +50,6 @@ def get_args(rest_args):
     parser.add_argument('--ppo_use_huberloss', type=boolean_argument, default=True, help='use huberloss instead of MSE')
     parser.add_argument('--ppo_use_clipped_value_loss', type=boolean_argument, default=True, help='clip value loss')
     parser.add_argument('--ppo_clip_param', type=float, default=0.05, help='clamp param')
-
-    # A2C specific
-    parser.add_argument('--a2c_alpha', type=float, default=0.99, help='RMSprop optimizer alpha (default: 0.99)')
 
     # other hyperparameters
     parser.add_argument('--lr_policy', type=float, default=0.0007, help='learning rate (default: 7e-4)')

@@ -1,6 +1,6 @@
 """
 Main scripts to start experiments.
-Takes a flag --env-type (see below for choices) and loads the parameters used in the paper.
+Takes a flag --env-type (see below for choices) and loads the parameters from the respective config file.
 """
 import argparse
 import warnings
@@ -21,7 +21,7 @@ from metalearner import MetaLearner
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env-type', default='cheetah_dir_varibad')
+    parser.add_argument('--env-type', default='cheetah_dir_oracle')
     args, rest_args = parser.parse_known_args()
     env = args.env_type
 

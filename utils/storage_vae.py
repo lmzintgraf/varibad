@@ -6,13 +6,13 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class RolloutStorageVAE(object):
     def __init__(self, num_processes, max_trajectory_len, zero_pad, max_num_rollouts,
-                 obs_dim, action_dim, vae_buffer_add_thresh, task_dim):
+                 state_dim, action_dim, vae_buffer_add_thresh, task_dim):
         """
         Store everything that is needed for the VAE update
         :param num_processes:
         """
 
-        self.obs_dim = obs_dim
+        self.obs_dim = state_dim
         self.action_dim = action_dim
         self.task_dim = task_dim
 
@@ -27,24 +27,25 @@ class RolloutStorageVAE(object):
         self.zero_pad = zero_pad
 
         # buffers for completed rollouts (stored on CPU)
-        self.prev_obs = torch.zeros((self.max_traj_len, self.max_buffer_size, obs_dim))
-        self.next_obs = torch.zeros((self.max_traj_len, self.max_buffer_size, obs_dim))
-        self.actions = torch.zeros((self.max_traj_len, self.max_buffer_size, action_dim))
-        self.rewards = torch.zeros((self.max_traj_len, self.max_buffer_size, 1))
-        if task_dim is not None:
-            self.tasks = torch.zeros((self.max_buffer_size, task_dim))
-        else:
-            self.tasks = None
-        self.trajectory_lens = [0] * self.max_buffer_size
+        if self.max_buffer_size > 0:
+            self.prev_state = torch.zeros((self.max_traj_len, self.max_buffer_size, state_dim))
+            self.next_state = torch.zeros((self.max_traj_len, self.max_buffer_size, state_dim))
+            self.actions = torch.zeros((self.max_traj_len, self.max_buffer_size, action_dim))
+            self.rewards = torch.zeros((self.max_traj_len, self.max_buffer_size, 1))
+            if task_dim is not None:
+                self.tasks = torch.zeros((self.max_buffer_size, task_dim))
+            else:
+                self.tasks = None
+            self.trajectory_lens = [0] * self.max_buffer_size
 
         # storage for each running process (stored on GPU)
         self.num_processes = num_processes
         self.curr_timestep = torch.zeros((num_processes)).long()  # count environment steps so we know where to insert
-        self.running_prev_obs = torch.zeros((self.max_traj_len, num_processes, obs_dim)).to(device)  # for each episode will have obs 0...N-1
-        self.running_next_obs = torch.zeros((self.max_traj_len, num_processes, obs_dim)).to(device)  # for each episode will have obs 1...N
+        self.running_prev_state = torch.zeros((self.max_traj_len, num_processes, state_dim)).to(device)  # for each episode will have obs 0...N-1
+        self.running_next_state = torch.zeros((self.max_traj_len, num_processes, state_dim)).to(device)  # for each episode will have obs 1...N
         self.running_rewards = torch.zeros((self.max_traj_len, num_processes, 1)).to(device)
         self.running_actions = torch.zeros((self.max_traj_len, num_processes, action_dim)).to(device)
-        if self.tasks is not None:
+        if task_dim is not None:
             self.running_tasks = torch.zeros((num_processes, task_dim)).to(device)
         else:
             self.running_tasks = None
@@ -55,14 +56,16 @@ class RolloutStorageVAE(object):
         (zero-padded to maximal trajectory length since different processes can have different trajectory lengths)
         :return:
         """
-        return self.running_prev_obs, self.running_next_obs, self.running_actions, self.running_rewards, self.curr_timestep
+        return self.running_prev_state, self.running_next_state, self.running_actions, self.running_rewards, self.curr_timestep
 
-    def insert(self, prev_obs, actions, next_obs, rewards, reset_task, task):
+    def insert(self, prev_state, actions, next_state, rewards, done, task):
+
+        # add to temporary buffer
 
         already_inserted = False
         if len(np.unique(self.curr_timestep)) == 1:
-            self.running_prev_obs[self.curr_timestep[0]] = prev_obs
-            self.running_next_obs[self.curr_timestep[0]] = next_obs
+            self.running_prev_state[self.curr_timestep[0]] = prev_state
+            self.running_next_state[self.curr_timestep[0]] = next_state
             self.running_rewards[self.curr_timestep[0]] = rewards
             self.running_actions[self.curr_timestep[0]] = actions
             if task is not None:
@@ -71,38 +74,38 @@ class RolloutStorageVAE(object):
             already_inserted = True
 
         already_reset = False
-        if reset_task.sum() == self.num_processes:
-            # add to buffer
-            if self.vae_buffer_add_thresh >= np.random.uniform(0, 1):
-                # check where to insert data
-                if self.insert_idx + self.num_processes > self.max_buffer_size:
-                    # keep track of how much we filled the buffer (for sampling from it)
-                    self.buffer_len = self.insert_idx
-                    # this will keep some entries at the end of the buffer without overwriting them,
-                    # but the buffer is large enough to make this negligible
-                    self.insert_idx = 0
-                else:
-                    self.buffer_len = max(self.buffer_len, self.insert_idx)
+        if done.sum() == self.num_processes:  # check if we can process the entire batch at once
 
-                # add; note: num trajectories are along dim=1,
-                # trajectory length along dim=0, to match pytorch RNN interface
-                self.prev_obs[:, self.insert_idx:self.insert_idx+self.num_processes] = self.running_prev_obs
-                self.next_obs[:, self.insert_idx:self.insert_idx+self.num_processes] = self.running_next_obs
-                self.actions[:, self.insert_idx:self.insert_idx+self.num_processes] = self.running_actions
-                self.rewards[:, self.insert_idx:self.insert_idx+self.num_processes] = self.running_rewards
-                if self.tasks is not None:
-                    insert_shape = self.tasks[self.insert_idx:self.insert_idx+self.num_processes].shape
-                    self.tasks[self.insert_idx:self.insert_idx+self.num_processes] = self.running_tasks.view(insert_shape)
-                self.trajectory_lens[self.insert_idx:self.insert_idx+self.num_processes] = self.curr_timestep.clone()
-
-                self.insert_idx += self.num_processes
+            # add to permanent (up to max_buffer_len) buffer
+            if self.max_buffer_size > 0:
+                if self.vae_buffer_add_thresh >= np.random.uniform(0, 1):
+                    # check where to insert data
+                    if self.insert_idx + self.num_processes > self.max_buffer_size:
+                        # keep track of how much we filled the buffer (for sampling from it)
+                        self.buffer_len = self.insert_idx
+                        # this will keep some entries at the end of the buffer without overwriting them,
+                        # but the buffer is large enough to make this negligible
+                        self.insert_idx = 0
+                    else:
+                        self.buffer_len = max(self.buffer_len, self.insert_idx)
+                    # add; note: num trajectories are along dim=1,
+                    # trajectory length along dim=0, to match pytorch RNN interface
+                    self.prev_state[:, self.insert_idx:self.insert_idx + self.num_processes] = self.running_prev_state
+                    self.next_state[:, self.insert_idx:self.insert_idx + self.num_processes] = self.running_next_state
+                    self.actions[:, self.insert_idx:self.insert_idx+self.num_processes] = self.running_actions
+                    self.rewards[:, self.insert_idx:self.insert_idx+self.num_processes] = self.running_rewards
+                    if (self.tasks is not None) and (self.running_tasks is not None):
+                        insert_shape = self.tasks[self.insert_idx:self.insert_idx+self.num_processes].shape
+                        self.tasks[self.insert_idx:self.insert_idx+self.num_processes] = self.running_tasks.reshape(insert_shape)
+                    self.trajectory_lens[self.insert_idx:self.insert_idx+self.num_processes] = self.curr_timestep.clone()
+                    self.insert_idx += self.num_processes
 
             # empty running buffer
-            self.running_prev_obs *= 0
-            self.running_next_obs *= 0
+            self.running_prev_state *= 0
+            self.running_next_state *= 0
             self.running_rewards *= 0
             self.running_actions *= 0
-            if self.tasks is not None:
+            if self.running_tasks is not None:
                 self.running_tasks *= 0
             self.curr_timestep *= 0
 
@@ -113,8 +116,8 @@ class RolloutStorageVAE(object):
             for i in range(self.num_processes):
 
                 if not already_inserted:
-                    self.running_prev_obs[self.curr_timestep[i], i] = prev_obs[i]
-                    self.running_next_obs[self.curr_timestep[i], i] = next_obs[i]
+                    self.running_prev_state[self.curr_timestep[i], i] = prev_state[i]
+                    self.running_next_state[self.curr_timestep[i], i] = next_state[i]
                     self.running_rewards[self.curr_timestep[i], i] = rewards[i]
                     self.running_actions[self.curr_timestep[i], i] = actions[i]
 
@@ -124,39 +127,37 @@ class RolloutStorageVAE(object):
 
                 if not already_reset:
                     # if we are at the end of a task, dump the data into the larger buffer
-                    if reset_task[i]:
+                    if done[i]:
 
-                        # add to buffer
-                        if self.vae_buffer_add_thresh >= np.random.uniform(0, 1):
-
-                            # check where to insert data
-                            if self.insert_idx + 1 > self.max_buffer_size:
-                                # keep track of how much we filled the buffer (for sampling from it)
-                                self.buffer_len = self.insert_idx
-                                # this will keep some entries at the end of the buffer without overwriting them,
-                                # but the buffer is large enough to make this negligible
-                                self.insert_idx = 0
-                            else:
-                                self.buffer_len = max(self.buffer_len, self.insert_idx)
-
-                            # add; note: num trajectories are along dim=1,
-                            # trajectory length along dim=0, to match pytorch RNN interface
-                            self.prev_obs[:, self.insert_idx] = self.running_prev_obs[:, i].to('cpu')
-                            self.next_obs[:, self.insert_idx] = self.running_next_obs[:, i].to('cpu')
-                            self.actions[:, self.insert_idx] = self.running_actions[:, i].to('cpu')
-                            self.rewards[:, self.insert_idx] = self.running_rewards[:, i].to('cpu')
-                            if self.tasks is not None:
-                                self.tasks[self.insert_idx] = self.running_tasks[i].to('cpu')
-                            self.trajectory_lens[self.insert_idx] = self.curr_timestep[i].clone()
-
-                            self.insert_idx += 1
+                        # add to permanent (up to max_buffer_len) buffer
+                        if self.max_buffer_size > 0:
+                            if self.vae_buffer_add_thresh >= np.random.uniform(0, 1):
+                                # check where to insert data
+                                if self.insert_idx + 1 > self.max_buffer_size:
+                                    # keep track of how much we filled the buffer (for sampling from it)
+                                    self.buffer_len = self.insert_idx
+                                    # this will keep some entries at the end of the buffer without overwriting them,
+                                    # but the buffer is large enough to make this negligible
+                                    self.insert_idx = 0
+                                else:
+                                    self.buffer_len = max(self.buffer_len, self.insert_idx)
+                                # add; note: num trajectories are along dim=1,
+                                # trajectory length along dim=0, to match pytorch RNN interface
+                                self.prev_state[:, self.insert_idx] = self.running_prev_state[:, i].to('cpu')
+                                self.next_state[:, self.insert_idx] = self.running_next_state[:, i].to('cpu')
+                                self.actions[:, self.insert_idx] = self.running_actions[:, i].to('cpu')
+                                self.rewards[:, self.insert_idx] = self.running_rewards[:, i].to('cpu')
+                                if self.tasks is not None:
+                                    self.tasks[self.insert_idx] = self.running_tasks[i].to('cpu')
+                                self.trajectory_lens[self.insert_idx] = self.curr_timestep[i].clone()
+                                self.insert_idx += 1
 
                         # empty running buffer
-                        self.running_prev_obs[:, i] *= 0
-                        self.running_next_obs[:, i] *= 0
+                        self.running_prev_state[:, i] *= 0
+                        self.running_next_state[:, i] *= 0
                         self.running_rewards[:, i] *= 0
                         self.running_actions[:, i] *= 0
-                        if self.tasks is not None:
+                        if self.running_tasks is not None:
                             self.running_tasks[i] *= 0
                         self.curr_timestep[i] = 0
 
@@ -176,8 +177,8 @@ class RolloutStorageVAE(object):
         trajectory_lens = np.array(self.trajectory_lens)[rollout_indices]
 
         # select the rollouts we want
-        prev_obs = self.prev_obs[:, rollout_indices, :]
-        next_obs = self.next_obs[:, rollout_indices, :]
+        prev_obs = self.prev_state[:, rollout_indices, :]
+        next_obs = self.next_state[:, rollout_indices, :]
         actions = self.actions[:, rollout_indices, :]
         rewards = self.rewards[:, rollout_indices, :]
         if self.tasks is not None:
