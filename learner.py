@@ -149,10 +149,10 @@ class Learner:
         start_time = time.time()
 
         # reset environments
-        prev_state, belief, task = utl.reset_env(self.envs, self.args)
+        state, belief, task = utl.reset_env(self.envs, self.args)
 
         # insert initial observation / embeddings to rollout storage
-        self.policy_storage.prev_state[0].copy_(prev_state)
+        self.policy_storage.prev_state[0].copy_(state)
 
         # log once before training
         self.log(None, None, start_time)
@@ -167,13 +167,13 @@ class Learner:
                     value, action, action_log_prob = utl.select_action(
                         args=self.args,
                         policy=self.policy,
-                        state=prev_state,
+                        state=state,
                         belief=belief,
                         task=task,
                         deterministic=False)
 
                 # observe reward and next obs
-                [next_state, belief, task], (rew_raw, rew_normalised), done, infos = utl.env_step(self.envs, action, self.args)
+                [state, belief, task], (rew_raw, rew_normalised), done, infos = utl.env_step(self.envs, action, self.args)
 
                 # create mask for episode ends
                 masks_done = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done]).to(device)
@@ -183,11 +183,11 @@ class Learner:
                 # reset environments that are done
                 done_indices = np.argwhere(done.flatten()).flatten()
                 if len(done_indices) > 0:
-                    next_state, belief, task = utl.reset_env(self.envs, self.args, indices=done_indices, state=next_state)
+                    state, belief, task = utl.reset_env(self.envs, self.args, indices=done_indices, state=state)
 
                 # add experience to policy buffer
                 self.policy_storage.insert(
-                    state=next_state,
+                    state=state,
                     belief=belief,
                     task=task,
                     actions=action,
@@ -197,16 +197,14 @@ class Learner:
                     value_preds=value,
                     masks=masks_done,
                     bad_masks=bad_masks,
-                    done=torch.from_numpy(np.array(done, dtype=float)).unsqueeze(1).clone(),
+                    done=torch.from_numpy(np.array(done, dtype=float)).unsqueeze(1),
                 )
-
-                prev_state = next_state
 
                 self.frames += self.args.num_processes
 
             # --- UPDATE ---
 
-            train_stats = self.update(state=prev_state, belief=belief, task=task)
+            train_stats = self.update(state=state, belief=belief, task=task)
 
             # log
             run_stats = [action, action_log_prob, value]

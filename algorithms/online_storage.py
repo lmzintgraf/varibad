@@ -123,19 +123,19 @@ class OnlineStorage(object):
         if self.args.pass_task_to_policy:
             self.tasks[self.step + 1].copy_(task)
         if self.args.pass_latent_to_policy:
-            self.latent_samples.append(latent_sample)
-            self.latent_mean.append(latent_mean)
-            self.latent_logvar.append(latent_logvar)
-            self.hidden_states[self.step + 1].copy_(hidden_states)
-        self.actions[self.step] = actions.clone()
+            self.latent_samples.append(latent_sample.detach().clone())
+            self.latent_mean.append(latent_mean.detach().clone())
+            self.latent_logvar.append(latent_logvar.detach().clone())
+            self.hidden_states[self.step + 1].copy_(hidden_states.detach())
+        self.actions[self.step] = actions.detach().clone()
         if action_log_probs is not None:
-            self.action_log_probs[self.step].copy_(action_log_probs)
+            self.action_log_probs[self.step].copy_(action_log_probs.detach())
         self.rewards_raw[self.step].copy_(rewards_raw)
         self.rewards_normalised[self.step].copy_(rewards_normalised)
         if isinstance(value_preds, list):
-            self.value_preds[self.step].copy_(value_preds[0])
+            self.value_preds[self.step].copy_(value_preds[0].detach())
         else:
-            self.value_preds[self.step].copy_(value_preds)
+            self.value_preds[self.step].copy_(value_preds.detach())
         self.masks[self.step + 1].copy_(masks)
         self.bad_masks[self.step + 1].copy_(bad_masks)
         self.done[self.step + 1].copy_(done)
@@ -143,6 +143,10 @@ class OnlineStorage(object):
 
     def after_update(self):
         self.prev_state[0].copy_(self.prev_state[-1])
+        if self.args.pass_belief_to_policy:
+            self.beliefs[0].copy_(self.beliefs[-1])
+        if self.args.pass_task_to_policy:
+            self.tasks[0].copy_(self.tasks[-1])
         if self.args.pass_latent_to_policy:
             self.latent_samples = []
             self.latent_mean = []
@@ -227,11 +231,11 @@ class OnlineStorage(object):
             else:
                 latent_sample_batch = latent_mean_batch = latent_logvar_batch = None
             if self.args.pass_belief_to_policy:
-                belief_batch = self.beliefs.reshape(-1, *self.beliefs.size()[2:])[indices]
+                belief_batch = self.beliefs[:-1].reshape(-1, *self.beliefs.size()[2:])[indices]
             else:
                 belief_batch = None
             if self.args.pass_task_to_policy:
-                task_batch = self.tasks.reshape(-1, *self.tasks.size()[2:])[indices]
+                task_batch = self.tasks[:-1].reshape(-1, *self.tasks.size()[2:])[indices]
             else:
                 task_batch = None
 

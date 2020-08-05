@@ -21,7 +21,7 @@ from metalearner import MetaLearner
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env-type', default='cheetah_dir_oracle')
+    parser.add_argument('--env-type', default='gridworld_belief_oracle')
     args, rest_args = parser.parse_known_args()
     env = args.env_type
 

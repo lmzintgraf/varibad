@@ -31,18 +31,18 @@ def get_args(rest_args):
     parser.add_argument('--norm_latent_for_policy', type=boolean_argument, default=True, help='normalise latent input')
     parser.add_argument('--norm_belief_for_policy', type=boolean_argument, default=True, help='normalise belief input')
     parser.add_argument('--norm_task_for_policy', type=boolean_argument, default=True, help='normalise task input')
-    parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=False, help='normalise rew for RL train')
+    parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=True, help='normalise rew for RL train')
     parser.add_argument('--norm_actions_of_policy', type=boolean_argument, default=False, help='normalise policy output')
 
     # network
-    parser.add_argument('--policy_layers', nargs='+', default=[32, 32])
+    parser.add_argument('--policy_layers', nargs='+', default=[32])
     parser.add_argument('--policy_activation_function', type=str, default='tanh', help='tanh/relu/leaky-relu')
     parser.add_argument('--policy_initialisation', type=str, default='normc', help='normc/orthogonal')
     parser.add_argument('--policy_anneal_lr', type=boolean_argument, default=False)
 
     # RL algorithm
-    parser.add_argument('--policy', type=str, default='a2c', help='choose: a2c, ppo')
-    parser.add_argument('--policy_optimiser', type=str, default='rmsprop', help='choose: rmsprop, adam')
+    parser.add_argument('--policy', type=str, default='ppo', help='choose: a2c, ppo')
+    parser.add_argument('--policy_optimiser', type=str, default='adam', help='choose: rmsprop, adam')
 
     # PPO specific
     parser.add_argument('--ppo_num_epochs', type=int, default=2, help='number of epochs per PPO update')

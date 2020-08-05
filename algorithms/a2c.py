@@ -57,7 +57,7 @@ class A2C:
                                      detach_every=args.tbptt_stepsize if hasattr(args, 'tbptt_stepsize') else None)
 
         # update the normalisation parameters of policy inputs before updating
-        self.actor_critic.policy.update_rms(policy_storage=policy_storage)
+        self.actor_critic.update_rms(args=args, policy_storage=policy_storage)
 
         data_generator = policy_storage.feed_forward_generator(advantages, 1)
         for sample in data_generator:

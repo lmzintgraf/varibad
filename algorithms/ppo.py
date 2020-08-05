@@ -72,7 +72,7 @@ class PPO:
                                      detach_every=args.tbptt_stepsize if hasattr(args, 'tbptt_stepsize') else None)
 
         # update the normalisation parameters of policy inputs before updating
-        self.actor_critic.update_rms(policy_storage=policy_storage)
+        self.actor_critic.update_rms(args=args, policy_storage=policy_storage)
 
         value_loss_epoch = 0
         action_loss_epoch = 0

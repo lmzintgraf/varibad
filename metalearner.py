@@ -196,13 +196,14 @@ class MetaLearner:
                 # bad_mask is true if episode ended because time limit was reached
                 bad_masks = torch.FloatTensor([[0.0] if 'bad_transition' in info.keys() else [1.0] for info in infos]).to(device)
 
-                # compute next embedding (for next loop and/or value prediction bootstrap)
-                latent_sample, latent_mean, latent_logvar, hidden_state = utl.update_encoding(encoder=self.vae.encoder,
-                                                                                              next_obs=next_state,
-                                                                                              action=action,
-                                                                                              reward=rew_raw,
-                                                                                              done=done,
-                                                                                              hidden_state=hidden_state)
+                with torch.no_grad():
+                    # compute next embedding (for next loop and/or value prediction bootstrap)
+                    latent_sample, latent_mean, latent_logvar, hidden_state = utl.update_encoding(encoder=self.vae.encoder,
+                                                                                                  next_obs=next_state,
+                                                                                                  action=action,
+                                                                                                  reward=rew_raw,
+                                                                                                  done=done,
+                                                                                                  hidden_state=hidden_state)
 
                 # before resetting, update the embedding and add to vae buffer
                 # (last state might include useful task info)
@@ -212,7 +213,7 @@ class MetaLearner:
                                                     next_state.clone(),
                                                     rew_raw.clone(),
                                                     done.clone(),
-                                                    task)
+                                                    task.clone() if task is not None else None)
 
                 if self.args.rlloss_through_encoder:
                     # add the obs before reset to the policy storage
@@ -220,9 +221,10 @@ class MetaLearner:
                     self.policy_storage.next_state[step] = next_state.clone()
 
                 # reset environments that are done
-                done_indices = np.argwhere(done.cpu().detach().flatten()).flatten()
+                done_indices = np.argwhere(done.cpu().flatten()).flatten()
                 if len(done_indices) > 0:
                     next_state, belief, task = utl.reset_env(self.envs, self.args, done_indices, next_state)
+
                 # TODO: deal with resampling for posterior sampling algorithm
                 #     latent_sample = latent_sample
                 #     latent_sample[i] = latent_sample[i]
@@ -232,7 +234,7 @@ class MetaLearner:
                     state=next_state,
                     belief=belief,
                     task=task,
-                    actions=action.clone(),
+                    actions=action,
                     action_log_probs=action_log_prob,
                     rewards_raw=rew_raw,
                     rewards_normalised=rew_normalised,
@@ -240,10 +242,10 @@ class MetaLearner:
                     masks=masks_done,
                     bad_masks=bad_masks,
                     done=done,
-                    hidden_states=hidden_state.squeeze(0).detach(),
-                    latent_sample=latent_sample.detach().clone(),
-                    latent_mean=latent_mean.detach().clone(),
-                    latent_logvar=latent_logvar.detach().clone(),
+                    hidden_states=hidden_state.squeeze(0),
+                    latent_sample=latent_sample,
+                    latent_mean=latent_mean,
+                    latent_logvar=latent_logvar,
                 )
 
                 prev_state = next_state
@@ -296,10 +298,10 @@ class MetaLearner:
                                                                                                        return_prior=True)
 
         # get the embedding / hidden state of the current time step (need to do this since we zero-padded)
-        latent_sample = (torch.stack([all_latent_samples[lens[i]][i] for i in range(len(lens))])).detach().to(device)
-        latent_mean = (torch.stack([all_latent_means[lens[i]][i] for i in range(len(lens))])).detach().to(device)
-        latent_logvar = (torch.stack([all_latent_logvars[lens[i]][i] for i in range(len(lens))])).detach().to(device)
-        hidden_state = (torch.stack([all_hidden_states[lens[i]][i] for i in range(len(lens))])).detach().to(device)
+        latent_sample = (torch.stack([all_latent_samples[lens[i]][i] for i in range(len(lens))])).to(device)
+        latent_mean = (torch.stack([all_latent_means[lens[i]][i] for i in range(len(lens))])).to(device)
+        latent_logvar = (torch.stack([all_latent_logvars[lens[i]][i] for i in range(len(lens))])).to(device)
+        hidden_state = (torch.stack([all_hidden_states[lens[i]][i] for i in range(len(lens))])).to(device)
 
         return latent_sample, latent_mean, latent_logvar, hidden_state
 

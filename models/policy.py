@@ -199,20 +199,22 @@ class Policy(nn.Module):
         value, _ = self.forward(state, latent, belief, task)
         return value
 
-    def update_rms(self, policy_storage):
+    def update_rms(self, args, policy_storage):
         """ Update normalisation parameters for inputs with current data """
         if self.pass_state_to_policy and self.norm_state:
-            state = policy_storage.prev_state
+            state = policy_storage.prev_state[:-1]
             self.state_rms.update(state)
         if self.pass_latent_to_policy and self.norm_latent:
-            latent = utl.get_latent_for_policy(policy_storage.latent_samples,
-                                               policy_storage.latent_mean,
-                                               policy_storage.latent_logvar)
+            latent = utl.get_latent_for_policy(args,
+                                               torch.cat(policy_storage.latent_samples[:-1]),
+                                               torch.cat(policy_storage.latent_mean[:-1]),
+                                               torch.cat(policy_storage.latent_logvar[:-1])
+                                               )
             self.latent_rms.update(latent)
         if self.pass_belief_to_policy and self.norm_belief:
-            self.belief_rms.update(policy_storage.beliefs)
+            self.belief_rms.update(policy_storage.beliefs[:-1])
         if self.pass_task_to_policy and self.norm_task:
-            self.task_rms.update(policy_storage.tasks)
+            self.task_rms.update(policy_storage.tasks[:-1])
 
     def evaluate_actions(self, state, latent, belief, task, action, return_action_mean=False):
 

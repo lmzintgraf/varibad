@@ -223,7 +223,7 @@ class GridNavi(gym.Env):
         episode_lengths = []
 
         episode_goals = []
-        if getattr(unwrapped_env, 'belief_oracle', False):
+        if args.pass_belief_to_policy and (encoder is None):
             episode_beliefs = [[] for _ in range(num_episodes)]
         else:
             episode_beliefs = None
@@ -264,8 +264,8 @@ class GridNavi(gym.Env):
                 episode_latent_logvars[episode_idx].append(curr_latent_logvar[0].clone())
 
             episode_all_obs[episode_idx].append(start_obs.clone())
-            if getattr(unwrapped_env, 'belief_oracle', False):
-                episode_beliefs[episode_idx].append(unwrapped_env.unwrapped._belief_state.copy())
+            if args.pass_belief_to_policy and (encoder is None):
+                episode_beliefs[episode_idx].append(belief)
 
             for step_idx in range(1, env._max_episode_steps + 1):
 
@@ -310,8 +310,8 @@ class GridNavi(gym.Env):
                 curr_rollout_rew.append(rew_raw.clone())
                 curr_rollout_goal.append(env.get_task().copy())
 
-                if getattr(unwrapped_env, 'belief_oracle', False):
-                    episode_beliefs[episode_idx].append(unwrapped_env.unwrapped._belief_state.copy())
+                if args.pass_belief_to_policy and (encoder is None):
+                    episode_beliefs[episode_idx].append(belief)
 
                 if infos[0]['done_mdp'] and not done:
                     start_obs = infos[0]['start_state']
@@ -443,7 +443,7 @@ def plot_bb(env, args, episode_all_obs, episode_goals, reward_decoder,
                 rew_pred_vars[episode_idx].append(rv)
                 plot_belief(env, rm, args)
             elif episode_beliefs is not None:
-                curr_beliefs = torch.tensor(episode_beliefs[episode_idx][step_idx])
+                curr_beliefs = episode_beliefs[episode_idx][step_idx]
                 plot_belief(env, curr_beliefs, args)
             else:
                 rew_pred_means = rew_pred_vars = None
