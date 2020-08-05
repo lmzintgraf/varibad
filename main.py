@@ -14,7 +14,9 @@ from config.mujoco import \
     args_cheetah_dir_oracle, args_cheetah_dir_rl2, args_cheetah_dir_varibad, \
     args_cheetah_vel_oracle, args_cheetah_vel_rl2, args_cheetah_vel_varibad, \
     args_ant_dir_oracle, args_ant_dir_rl2, args_ant_dir_varibad, \
-    args_walker_oracle, args_walker_rl2, args_walker_varibad
+    args_ant_goal_oracle, \
+    args_walker_oracle, args_walker_rl2, args_walker_varibad, \
+    args_hopper_oracle
 from learner import Learner
 from metalearner import MetaLearner
 
@@ -47,6 +49,10 @@ def main():
     elif env == 'ant_dir_varibad':
         args = args_ant_dir_varibad.get_args(rest_args)
     #
+    # - AntGoal -
+    elif env == 'ant_goal_oracle':
+        args = args_ant_goal_oracle.get_args(rest_args)
+    #
     # - CheetahDir -
     elif env == 'cheetah_dir_oracle':
         args = args_cheetah_dir_oracle.get_args(rest_args)
@@ -70,6 +76,10 @@ def main():
         args = args_walker_rl2.get_args(rest_args)
     elif env == 'walker_varibad':
         args = args_walker_varibad.get_args(rest_args)
+    #
+    # - Hopper -
+    elif env == 'hopper_oracle':
+        args = args_hopper_oracle.get_args(rest_args)
 
     # warning for deterministic execution
     if args.deterministic_execution:
