@@ -50,18 +50,3 @@ class Walker2DRandParamsEnv(RandomEnv, utils.EzPickle):
         self.viewer.cam.distance = self.model.stat.extent * 0.5
         self.viewer.cam.lookat[2] += .8
         self.viewer.cam.elevation = -20
-
-
-class Walker2DRandParamsOracleEnv(Walker2DRandParamsEnv):
-    def _get_obs(self):
-        if hasattr(self, 'cur_params'):
-            task = self.get_task()
-            task = np.concatenate([task[k].reshape(-1) for k in task.keys()])[:, np.newaxis]
-        else:
-            task = np.zeros((self.rand_param_dim, 1))
-        qpos = self.model.data.qpos
-        qvel = self.model.data.qvel
-        return np.concatenate([qpos[1:],
-                               np.clip(qvel, -10, 10),
-                               task
-                               ]).ravel()

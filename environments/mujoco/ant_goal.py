@@ -43,7 +43,7 @@ class AntGoalEnv(AntEnv):
         self.goal_pos = task
 
     def get_task(self):
-        return self.goal_pos
+        return np.array(self.goal_pos)
 
     def _get_obs(self):
         return np.concatenate([

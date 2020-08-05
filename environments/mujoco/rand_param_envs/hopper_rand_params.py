@@ -52,17 +52,3 @@ class HopperRandParamsEnv(RandomEnv, utils.EzPickle):
         ob = super()._reset()
         self._elapsed_steps = 0
         return ob
-
-
-class HopperRandParamsOracleEnv(HopperRandParamsEnv):
-    def _get_obs(self):
-        if hasattr(self, 'cur_params'):
-            task = self.get_task()
-            task = np.concatenate([task[k].reshape(-1) for k in task.keys()])[:, np.newaxis]
-        else:
-            task = np.zeros((self.rand_param_dim, 1))
-        return np.concatenate([
-            self.model.data.qpos.flat[1:],
-            np.clip(self.model.data.qvel.flat, -10, 10),
-            task.flat,
-        ])

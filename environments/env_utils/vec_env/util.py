@@ -37,10 +37,13 @@ def obs_space_info(obs_space):
         shapes: a dict mapping keys to shapes.
         dtypes: a dict mapping keys to dtypes.
     """
-    if isinstance(obs_space, gym.spaces.Dict):
-        assert isinstance(obs_space.spaces, OrderedDict)
-        subspaces = obs_space.spaces
-    else:
+    try:
+        if isinstance(obs_space, gym.spaces.Dict):
+            assert isinstance(obs_space.spaces, OrderedDict)
+            subspaces = obs_space.spaces
+        else:
+            subspaces = {None: obs_space}
+    except AttributeError:
         subspaces = {None: obs_space}
     keys = []
     shapes = {}

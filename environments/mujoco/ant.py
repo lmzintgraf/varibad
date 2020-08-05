@@ -101,8 +101,9 @@ class AntEnv(MujocoEnv):
 
         # (re)set environment
         env.reset_task()
-        state = env.reset().float().reshape((1, -1)).to(device)
+        state, belief, task = utl.reset_env(env, args)
         start_obs_raw = state.clone()
+        task = task.view(-1) if task is not None else None
 
         # initialise actions and rewards (used as initial input to policy if we have a recurrent policy)
         if hasattr(args, 'hidden_size'):
@@ -111,7 +112,6 @@ class AntEnv(MujocoEnv):
             hidden_state = None
 
         # keep track of what task we're in and the position of the cheetah
-        task = env.get_task()
         pos = [[] for _ in range(args.max_rollouts_per_task)]
         start_pos = unwrapped_env.get_body_com("torso")[:2].copy()
 
@@ -142,14 +142,16 @@ class AntEnv(MujocoEnv):
                 else:
                     episode_prev_obs[episode_idx].append(state.clone())
                 # act
-                o_aug = utl.get_latent_for_policy(args,
-                                                  latent_sample=curr_latent_sample,
-                                                  latent_mean=curr_latent_mean,
-                                                  latent_logvar=curr_latent_logvar)
-                _, action, _ = policy.act(o_aug, deterministic=True)
+                latent = utl.get_latent_for_policy(args,
+                                                   latent_sample=curr_latent_sample,
+                                                   latent_mean=curr_latent_mean,
+                                                   latent_logvar=curr_latent_logvar)
+                _, action, _ = policy.act(state=state.view(-1), latent=latent, belief=belief, task=task,
+                                          deterministic=True)
 
-                state, (rew_raw, rew_normalised), done, info = env.step(action.cpu().detach())
+                (state, belief, task), (rew, rew_normalised), done, info = utl.env_step(env, action, args)
                 state = state.float().reshape((1, -1)).to(device)
+                task = task.view(-1) if task is not None else None
 
                 # keep track of position
                 pos[episode_idx].append(unwrapped_env.get_body_com("torso")[:2].copy())
@@ -157,18 +159,15 @@ class AntEnv(MujocoEnv):
                 if encoder is not None:
                     # update task embedding
                     curr_latent_sample, curr_latent_mean, curr_latent_logvar, hidden_state = encoder(
-                        action.float().to(device),
-                        state,
-                        rew_raw.reshape((1, 1)).float().to(device),
-                        hidden_state,
-                        return_prior=False)
+                        action.reshape(1, -1).float().to(device), state, rew.reshape(1, -1).float().to(device),
+                        hidden_state, return_prior=False)
 
                     episode_latent_samples[episode_idx].append(curr_latent_sample[0].clone())
                     episode_latent_means[episode_idx].append(curr_latent_mean[0].clone())
                     episode_latent_logvars[episode_idx].append(curr_latent_logvar[0].clone())
 
                 episode_next_obs[episode_idx].append(state.clone())
-                episode_rewards[episode_idx].append(rew_raw.clone())
+                episode_rewards[episode_idx].append(rew.clone())
                 episode_actions[episode_idx].append(action.clone())
 
                 if info[0]['done_mdp'] and not done:
@@ -208,6 +207,7 @@ class AntEnv(MujocoEnv):
 
             plt.title('task: {}'.format(task), fontsize=15)
             if args.env_name == 'AntGoal-v0':
+                task = task.cpu()
                 plt.plot(task[0], task[1], 'rx')
 
             plt.ylabel('y-position (ep {})'.format(i), fontsize=15)

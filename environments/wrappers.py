@@ -5,7 +5,11 @@ from gym.envs.registration import load
 
 from environments.mujoco import rand_param_envs
 
-gym.logger.set_level(40)  # this is to suppress some warnings
+try:
+    # this is to suppress some warnings (in the newer mujoco versions)
+    gym.logger.set_level(40)
+except AttributeError:
+    pass
 
 
 def mujoco_wrapper(entry_point, **kwargs):
@@ -130,6 +134,24 @@ class VariBadWrapper(gym.Wrapper):
 
         return state, reward, done_bamdp, info
 
+    def __getattr__(self, attr):
+        """
+        If env does not have the attribute then call the attribute in the wrapped_env
+        (This one's only needed for mujoco 131)
+        """
+        try:
+            orig_attr = self.__getattribute__(attr)
+        except AttributeError:
+            orig_attr = self.unwrapped.__getattribute__(attr)
+        if callable(orig_attr):
+            def hooked(*args, **kwargs):
+                result = orig_attr(*args, **kwargs)
+                return result
+
+            return hooked
+        else:
+            return orig_attr
+
 
 class TimeLimitMask(gym.Wrapper):
 
@@ -141,3 +163,21 @@ class TimeLimitMask(gym.Wrapper):
 
     def reset(self, **kwargs):
         return self.env.reset(**kwargs)
+
+    def __getattr__(self, attr):
+        """
+        If env does not have the attribute then call the attribute in the wrapped_env
+        (This one's only needed for mujoco 131)
+        """
+        try:
+            orig_attr = self.__getattribute__(attr)
+        except AttributeError:
+            orig_attr = self.unwrapped.__getattribute__(attr)
+        if callable(orig_attr):
+            def hooked(*args, **kwargs):
+                result = orig_attr(*args, **kwargs)
+                return result
+
+            return hooked
+        else:
+            return orig_attr

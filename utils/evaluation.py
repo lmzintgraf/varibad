@@ -192,23 +192,26 @@ def get_test_rollout(args, env, policy, encoder=None):
     else:
         curr_latent_sample = curr_latent_mean = curr_latent_logvar = None
         episode_latent_means = episode_latent_logvars = None
+
     # --- roll out policy ---
 
     # (re)set environment
-    state = env.reset().reshape((1, -1)).to(device)
+    env.reset_task()
+    state, belief, task = utl.reset_env(env, args)
+    state = state.reshape((1, -1)).to(device)
+    task = task.view(-1) if task is not None else None
 
     for episode_idx in range(num_episodes):
 
         curr_rollout_rew = []
 
         if encoder is not None:
-            if episode_idx == 0 and encoder:
+            if episode_idx == 0:
                 # reset to prior
                 curr_latent_sample, curr_latent_mean, curr_latent_logvar, hidden_state = encoder.prior(1)
                 curr_latent_sample = curr_latent_sample[0].to(device)
                 curr_latent_mean = curr_latent_mean[0].to(device)
                 curr_latent_logvar = curr_latent_logvar[0].to(device)
-
             episode_latent_samples[episode_idx].append(curr_latent_sample[0].clone())
             episode_latent_means[episode_idx].append(curr_latent_mean[0].clone())
             episode_latent_logvars[episode_idx].append(curr_latent_logvar[0].clone())
@@ -217,16 +220,16 @@ def get_test_rollout(args, env, policy, encoder=None):
 
             episode_prev_obs[episode_idx].append(state.clone())
 
-            _, action, _ = utl.select_action(args=args,
-                                             policy=policy,
-                                             state=state,
-                                             deterministic=True,
-                                             latent_sample=curr_latent_sample, latent_mean=curr_latent_mean,
-                                             latent_logvar=curr_latent_logvar)
+            latent = utl.get_latent_for_policy(args,
+                                               latent_sample=curr_latent_sample,
+                                               latent_mean=curr_latent_mean,
+                                               latent_logvar=curr_latent_logvar)
+            _, action, _ = policy.act(state=state.view(-1), latent=latent, belief=belief, task=task, deterministic=True)
 
             # observe reward and next obs
-            state, (rew_raw, rew_normalised), done, infos = utl.env_step(env, action)
+            (state, belief, task), (rew_raw, rew_normalised), done, infos = utl.env_step(env, action, args)
             state = state.reshape((1, -1)).to(device)
+            task = task.view(-1) if task is not None else None
 
             if encoder is not None:
                 # update task embedding

@@ -52,7 +52,7 @@ class AntDirEnv(AntEnv):
         self.goal_direction = task
 
     def get_task(self):
-        return self.goal_direction
+        return np.array([self.goal_direction])
 
 
 class AntDir2DEnv(AntDirEnv):

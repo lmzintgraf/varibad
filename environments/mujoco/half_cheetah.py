@@ -62,25 +62,21 @@ class HalfCheetahEnv(HalfCheetahEnv_):
             episode_latent_samples = [[] for _ in range(num_episodes)]
             episode_latent_means = [[] for _ in range(num_episodes)]
             episode_latent_logvars = [[] for _ in range(num_episodes)]
-            sample_embeddings = args.sample_embeddings
         else:
+            curr_latent_sample = curr_latent_mean = curr_latent_logvar = None
             episode_latent_samples = episode_latent_means = episode_latent_logvars = None
-            sample_embeddings = False
 
         # --- roll out policy ---
 
         # (re)set environment
         env.reset_task()
-
-        # state = env.reset().reshape((1, -1)).float().to(device)
         state, belief, task = utl.reset_env(env, args)
         start_state = state.clone()
 
-        # initialise actions and rewards (used as initial input to policy if we have a recurrent policy)
-        if hasattr(args, 'hidden_size'):
-            hidden_state = torch.zeros((1, args.hidden_size)).to(device)
-        else:
-            hidden_state = None
+        # if hasattr(args, 'hidden_size'):
+        #     hidden_state = torch.zeros((1, args.hidden_size)).to(device)
+        # else:
+        #     hidden_state = None
 
         # keep track of what task we're in and the position of the cheetah
         pos = [[] for _ in range(args.max_rollouts_per_task)]
@@ -91,17 +87,13 @@ class HalfCheetahEnv(HalfCheetahEnv_):
             curr_rollout_rew = []
             pos[episode_idx].append(start_pos)
 
-            if episode_idx == 0:
-                if encoder is not None:
+            if encoder is not None:
+                if episode_idx == 0:
                     # reset to prior
                     curr_latent_sample, curr_latent_mean, curr_latent_logvar, hidden_state = encoder.prior(1)
                     curr_latent_sample = curr_latent_sample[0].to(device)
                     curr_latent_mean = curr_latent_mean[0].to(device)
                     curr_latent_logvar = curr_latent_logvar[0].to(device)
-                else:
-                    curr_latent_sample = curr_latent_mean = curr_latent_logvar = None
-
-            if encoder is not None:
                 episode_latent_samples[episode_idx].append(curr_latent_sample[0].clone())
                 episode_latent_means[episode_idx].append(curr_latent_mean[0].clone())
                 episode_latent_logvars[episode_idx].append(curr_latent_logvar[0].clone())
@@ -119,7 +111,7 @@ class HalfCheetahEnv(HalfCheetahEnv_):
                                                    latent_logvar=curr_latent_logvar)
                 _, action, _ = policy.act(state=state.view(-1), latent=latent, belief=belief, task=task, deterministic=True)
 
-                state, (rew, rew_normalised), done, info = env.step(action.cpu().detach())
+                (state, belief, task), (rew, rew_normalised), done, info = utl.env_step(env, action, args)
                 state = state.reshape((1, -1)).float().to(device)
 
                 # keep track of position
