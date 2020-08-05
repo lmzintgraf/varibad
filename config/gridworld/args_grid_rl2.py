@@ -65,7 +65,9 @@ def get_args(rest_args):
     parser.add_argument('--ppo_clip_param', type=float, default=0.05, help='clamp param')
 
     # other hyperparameters
-    parser.add_argument('--lr_policy', type=float, default=0.0007, help='learning rate (default: 7e-4)')
+    parser.add_argument('--lr_policy', type=float, default=7e-4, help='learning rate (default: 7e-4)')
+    # since we use RL2, we have to match this LR (for the encoder) with the one for the policy
+    parser.add_argument('--lr_vae', type=float, default=7e-4)
     parser.add_argument('--num_processes', type=int, default=16,
                         help='how many training CPU processes / parallel environments to use (default: 16)')
     parser.add_argument('--policy_num_steps', type=int, default=60,
@@ -85,7 +87,6 @@ def get_args(rest_args):
     # --- VAE TRAINING ---
 
     # general
-    parser.add_argument('--lr_vae', type=float, default=7e-4)
     parser.add_argument('--size_vae_buffer', type=int, default=0,
                         help='how many trajectories (!) to keep in VAE buffer')
     parser.add_argument('--precollect_len', type=int, default=0,

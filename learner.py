@@ -114,6 +114,7 @@ class Learner:
         # initialise policy trainer
         if self.args.policy == 'a2c':
             policy = A2C(
+                self.args,
                 policy_net,
                 self.args.policy_value_loss_coef,
                 self.args.policy_entropy_coef,
@@ -125,6 +126,7 @@ class Learner:
             )
         elif self.args.policy == 'ppo':
             policy = PPO(
+                self.args,
                 policy_net,
                 self.args.policy_value_loss_coef,
                 self.args.policy_entropy_coef,
@@ -232,7 +234,7 @@ class Learner:
                                             self.args.policy_tau,
                                             use_proper_time_limits=self.args.use_proper_time_limits)
 
-        policy_train_stats = self.policy.update(args=self.args, policy_storage=self.policy_storage)
+        policy_train_stats = self.policy.update(policy_storage=self.policy_storage)
 
         return policy_train_stats, None
 

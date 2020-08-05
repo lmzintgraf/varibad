@@ -111,6 +111,7 @@ class MetaLearner:
         # initialise policy trainer
         if self.args.policy == 'a2c':
             policy = A2C(
+                self.args,
                 policy_net,
                 self.args.policy_value_loss_coef,
                 self.args.policy_entropy_coef,
@@ -123,6 +124,7 @@ class MetaLearner:
             )
         elif self.args.policy == 'ppo':
             policy = PPO(
+                self.args,
                 policy_net,
                 self.args.policy_value_loss_coef,
                 self.args.policy_entropy_coef,
@@ -334,7 +336,6 @@ class MetaLearner:
 
             # update agent (this will also call the VAE update!)
             policy_train_stats = self.policy.update(
-                args=self.args,
                 policy_storage=self.policy_storage,
                 encoder=self.vae.encoder,
                 rlloss_through_encoder=self.args.rlloss_through_encoder,
