@@ -51,7 +51,7 @@ class PPO:
         if policy_anneal_lr:
             lam = lambda f: 1 - f / train_steps
             self.lr_scheduler_policy = optim.lr_scheduler.LambdaLR(self.optimiser, lr_lambda=lam)
-            if self.args.rlloss_through_encoder:
+            if hasattr(self.args, 'rlloss_through_encoder') and self.args.rlloss_through_encoder:
                 self.lr_scheduler_encoder = optim.lr_scheduler.LambdaLR(self.optimiser_vae, lr_lambda=lam)
 
     def update(self,

@@ -14,7 +14,7 @@ from config.mujoco import \
     args_cheetah_dir_oracle, args_cheetah_dir_rl2, args_cheetah_dir_varibad, \
     args_cheetah_vel_oracle, args_cheetah_vel_rl2, args_cheetah_vel_varibad, \
     args_ant_dir_oracle, args_ant_dir_rl2, args_ant_dir_varibad, \
-    args_ant_goal_oracle, \
+    args_ant_goal_oracle, args_ant_goal_varibad, \
     args_walker_oracle, args_walker_rl2, args_walker_varibad, \
     args_hopper_oracle
 from learner import Learner
@@ -23,7 +23,7 @@ from metalearner import MetaLearner
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env-type', default='gridworld_rl2')
+    parser.add_argument('--env-type', default='ant_goal_varibad')
     args, rest_args = parser.parse_known_args()
     env = args.env_type
 
@@ -52,6 +52,8 @@ def main():
     # - AntGoal -
     elif env == 'ant_goal_oracle':
         args = args_ant_goal_oracle.get_args(rest_args)
+    elif env == 'ant_goal_varibad':
+        args = args_ant_goal_varibad.get_args(rest_args)
     #
     # - CheetahDir -
     elif env == 'cheetah_dir_oracle':

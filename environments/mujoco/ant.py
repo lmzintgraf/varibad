@@ -186,7 +186,7 @@ class AntEnv(MujocoEnv):
 
         episode_prev_obs = [torch.cat(e) for e in episode_prev_obs]
         episode_next_obs = [torch.cat(e) for e in episode_next_obs]
-        episode_actions = [torch.cat(e) for e in episode_actions]
+        episode_actions = [torch.stack(e) for e in episode_actions]
         episode_rewards = [torch.cat(e) for e in episode_rewards]
 
         # plot the movement of the ant
@@ -205,10 +205,10 @@ class AntEnv(MujocoEnv):
 
             plt.scatter(x, y, 1, 'g')
 
-            plt.title('task: {}'.format(task), fontsize=15)
+            curr_task = env.get_task()
+            plt.title('task: {}'.format(curr_task), fontsize=15)
             if args.env_name == 'AntGoal-v0':
-                task = task.cpu()
-                plt.plot(task[0], task[1], 'rx')
+                plt.plot(curr_task[0], curr_task[1], 'rx')
 
             plt.ylabel('y-position (ep {})'.format(i), fontsize=15)
 
