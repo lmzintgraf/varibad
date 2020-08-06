@@ -211,7 +211,7 @@ class VaribadVAE:
         else:
             return loss_task
 
-    def compute_kl_loss(self, latent_mean, latent_logvar, len_encoder):
+    def compute_kl_loss(self, latent_mean, latent_logvar, elbo_indices):
         # -- KL divergence
         if self.args.kl_to_gauss_prior:
             kl_divergences = (- 0.5 * (1 + latent_logvar - latent_mean.pow(2) - latent_logvar.exp()).sum(dim=-1))
@@ -230,8 +230,8 @@ class VaribadVAE:
                 1 / torch.exp(logS) * torch.exp(logE), dim=-1) + ((m - mu) / torch.exp(logS) * (m - mu)).sum(dim=-1))
 
         # returns, for each ELBO_t term, one KL (so H+1 kl's)
-        if len_encoder is not None:
-            return kl_divergences[len_encoder]
+        if elbo_indices is not None:
+            return kl_divergences[elbo_indices]
         else:
             return kl_divergences
 
@@ -261,7 +261,12 @@ class VaribadVAE:
 
     def compute_loss(self, latent_mean, latent_logvar, vae_prev_obs, vae_next_obs, vae_actions,
                      vae_rewards, vae_tasks, trajectory_lens):
+        """
+        Computes the VAE loss for the given data.
+        Batches everything together and therefore needs all trajectories to be of the same length.
+        """
 
+        # TODO: the ant can die and then this will be wrong - how to fix?
         assert (len(np.unique(trajectory_lens)) == 1) and not self.args.decode_only_past
 
         # take one sample for each ELBO term
@@ -272,7 +277,18 @@ class VaribadVAE:
 
         num_elbos = latent_samples.shape[0]
         num_decodes = vae_prev_obs.shape[0]
-        batchsize = latent_samples.shape[1]
+        batchsize = latent_samples.shape[1]  # number of trajectories
+
+        # subsample elbo terms
+        if self.args.vae_subsample_elbos is not None:
+            # shape before: num_elbos * batchsize * dim
+            # shape after: vae_subsample_elbos * batchsize * dim
+            elbo_indices = torch.LongTensor(self.args.vae_subsample_elbos * batchsize).random_(0, num_elbos)    # select diff elbos for each task
+            task_indices = torch.arange(batchsize).repeat(self.args.vae_subsample_elbos)                        # this is just to make the selection mask
+            latent_samples = latent_samples[elbo_indices, task_indices, :].reshape((self.args.vae_subsample_elbos, batchsize, -1))
+            num_elbos = latent_samples.shape[0]
+        else:
+            elbo_indices = None
 
         # expand the state/rew/action inputs to the decoder (to match size of latents)
         # shape will be: [num tasks in batch] x [num elbos] x [len trajectory (reconstrution loss)] x [dimension]
@@ -325,7 +341,7 @@ class VaribadVAE:
 
         if not self.args.disable_stochasticity_in_latent:
             # compute the KL term for each ELBO term of the current trajectory
-            kl_loss = self.compute_kl_loss(latent_mean, latent_logvar, None)
+            kl_loss = self.compute_kl_loss(latent_mean, latent_logvar, elbo_indices)
             # sum the elbos, average across tasks
             kl_loss = kl_loss.sum(dim=0).mean()
         else:

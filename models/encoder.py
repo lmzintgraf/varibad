@@ -49,6 +49,7 @@ class RNNEncoder(nn.Module):
             curr_input_dim = layers_before_gru[i]
 
         # recurrent unit
+        # TODO: TEST RNN vs GRU vs LSTM
         self.gru = nn.GRU(input_size=curr_input_dim,
                           hidden_size=hidden_size,
                           num_layers=1,

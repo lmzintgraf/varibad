@@ -13,6 +13,34 @@ from torch.nn import functional as F
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
+# def save_models(args, logger, policy, vae, envs, iter_idx):
+#     # TODO: save parameters, not entire model
+#
+#     save_path = os.path.join(logger.full_output_folder, 'models')
+#     if not os.path.exists(save_path):
+#         os.mkdir(save_path)
+#     try:
+#         torch.save(policy.actor_critic, os.path.join(save_path, "policy{0}.pt".format(iter_idx)))
+#     except AttributeError:
+#         torch.save(policy.policy, os.path.join(save_path, "policy{0}.pt".format(iter_idx)))
+#     torch.save(vae.encoder, os.path.join(save_path, "encoder{0}.pt".format(iter_idx)))
+#     if vae.state_decoder is not None:
+#         torch.save(vae.state_decoder, os.path.join(save_path, "state_decoder{0}.pt".format(iter_idx)))
+#     if vae.reward_decoder is not None:
+#         torch.save(vae.reward_decoder,
+#                    os.path.join(save_path, "reward_decoder{0}.pt".format(iter_idx)))
+#     if vae.task_decoder is not None:
+#         torch.save(vae.task_decoder, os.path.join(save_path, "task_decoder{0}.pt".format(iter_idx)))
+#
+#     # save normalisation params of envs
+#     if args.norm_rew_for_policy:
+#         rew_rms = envs.venv.ret_rms
+#         save_obj(rew_rms, save_path, "env_rew_rms{0}.pkl".format(iter_idx))
+#     if args.norm_obs_for_policy:
+#         obs_rms = envs.venv.obs_rms
+#         save_obj(obs_rms, save_path, "env_obs_rms{0}.pkl".format(iter_idx))
+
+
 def reset_env(env, args, indices=None, state=None):
     """ env can be many environments or just one """
     # reset all environments
@@ -276,3 +304,21 @@ def get_num_tasks(args):
     except AttributeError:
         num_tasks = None
     return num_tasks
+
+
+def clip(value, low, high):
+    """Imitates `{np,tf}.clip`.
+
+    `torch.clamp` doesn't support tensor valued low/high so this provides the
+    clip functionality.
+
+    TODO(hartikainen): The broadcasting hasn't been extensively tested yet,
+        but works for the regular cases where
+        `value.shape == low.shape == high.shape` or when `{low,high}.shape == ()`.
+    """
+    low, high = torch.tensor(low), torch.tensor(high)
+
+    assert torch.all(low <= high), (low, high)
+
+    clipped_value = torch.max(torch.min(value, high), low)
+    return clipped_value

@@ -61,7 +61,7 @@ class A2C:
                                                                                       'tbptt_stepsize') else None)
 
         # update the normalisation parameters of policy inputs before updating
-        self.actor_critic.update_rms(args=self.self.args, policy_storage=policy_storage)
+        self.actor_critic.update_rms(args=self.args, policy_storage=policy_storage)
 
         data_generator = policy_storage.feed_forward_generator(advantages, 1)
         for sample in data_generator:

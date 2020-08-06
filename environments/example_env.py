@@ -29,6 +29,7 @@ class ExampleEnv(gym.Env):
     def reset_task(self, task=None):
         """
         Reset the task, either at random (if task=None) or the given task.
+        Should *not* reset the environment.
         """
         pass
 

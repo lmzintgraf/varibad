@@ -156,7 +156,8 @@ class MetaLearner:
         self.policy_storage.prev_state[0].copy_(prev_state)
 
         # log once before training
-        self.log(None, None, start_time)
+        with torch.no_grad():
+            self.log(None, None, start_time)
 
         vae_is_pretrained = False
         for self.iter_idx in range(self.num_updates):
@@ -277,7 +278,8 @@ class MetaLearner:
                     # log
                     run_stats = [action, action_log_prob, value]
                     if train_stats is not None:
-                        self.log(run_stats, train_stats, start_time)
+                        with torch.no_grad():
+                            self.log(run_stats, train_stats, start_time)
 
             # clean up after update
             self.policy_storage.after_update()

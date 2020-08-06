@@ -147,7 +147,7 @@ class Learner:
         return policy
 
     def train(self):
-        """ Main traning loop """
+        """ Main training loop """
         start_time = time.time()
 
         # reset environments
@@ -157,7 +157,8 @@ class Learner:
         self.policy_storage.prev_state[0].copy_(state)
 
         # log once before training
-        self.log(None, None, start_time)
+        with torch.no_grad():
+            self.log(None, None, start_time)
 
         for self.iter_idx in range(self.num_updates):
 
@@ -211,7 +212,8 @@ class Learner:
             # log
             run_stats = [action, action_log_prob, value]
             if train_stats is not None:
-                self.log(run_stats, train_stats, start_time)
+                with torch.no_grad():
+                    self.log(run_stats, train_stats, start_time)
 
             # clean up after update
             self.policy_storage.after_update()

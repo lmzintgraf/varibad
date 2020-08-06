@@ -147,7 +147,8 @@ class Policy(nn.Module):
 
         # handle inputs (normalise + embed)
 
-        if self.pass_state_to_policy: 
+        if self.pass_state_to_policy:
+            # TODO: somehow don't normalise the "done" flag (if existing)
             if self.norm_state:
                 state = (state - self.state_rms.mean) / torch.sqrt(self.state_rms.var + 1e-8)
             if self.use_state_encoder:
@@ -305,8 +306,9 @@ class DiagGaussian(nn.Module):
     def forward(self, x):
         action_mean = self.fc_mean(x)
         if self.norm_actions_of_policy:
-            if self.unique_action_limits and torch.unique(self.action_low) == -1 and torch.unique(
-                    self.action_high) == 1:
+            if self.unique_action_limits and \
+                    torch.unique(self.action_low) == -1 and \
+                    torch.unique(self.action_high) == 1:
                 action_mean = torch.tanh(action_mean)
             else:
                 # TODO: this isn't tested

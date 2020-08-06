@@ -168,6 +168,7 @@ class RolloutStorageVAE(object):
         return self.buffer_len
 
     def get_batch(self, num_enc_len=1, num_rollouts=5, include_final=True, replace=False):
+        # TODO: check if we can get rid of num_enc_len and num_rollouts (call it batchsize instead)
 
         num_rollouts = min(self.buffer_len, num_rollouts)
 
@@ -188,8 +189,9 @@ class RolloutStorageVAE(object):
 
         # choose where to chop up the trajectories
         if num_enc_len is not None:
+            replace = num_enc_len <= self.buffer_len
             len_encoder = np.stack(
-                [np.random.choice(range(0, t + int(include_final)), num_enc_len, replace=False) for t in trajectory_lens])
+                [np.random.choice(range(0, t + int(include_final)), num_enc_len, replace=replace) for t in trajectory_lens])
         else:
             len_encoder = np.stack([range(0, t + 1) for t in trajectory_lens])
 

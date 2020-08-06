@@ -1,7 +1,4 @@
 import argparse
-
-import torch
-
 from utils.helpers import boolean_argument
 
 
