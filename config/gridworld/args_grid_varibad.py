@@ -87,6 +87,10 @@ def get_args(rest_args):
                         help='for how many timesteps to compute the ELBO; None uses all')
     parser.add_argument('--vae_subsample_decodes', type=int, default=None,
                         help='number of reconstruction terms to subsample; None uses all')
+    parser.add_argument('--vae_avg_elbo_terms', type=boolean_argument, default=False,
+                        help='Average ELBO terms (instead of sum)')
+    parser.add_argument('--vae_avg_reconstruction_terms', type=boolean_argument, default=False,
+                        help='Average reconstruction terms (instead of sum)')
     parser.add_argument('--num_vae_updates', type=int, default=3,
                         help='how many VAE update steps to take per meta-iteration')
     parser.add_argument('--pretrain_len', type=int, default=0, help='for how many updates to pre-train the VAE')

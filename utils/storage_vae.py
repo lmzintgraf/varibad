@@ -167,13 +167,13 @@ class RolloutStorageVAE(object):
     def __len__(self):
         return self.buffer_len
 
-    def get_batch(self, num_enc_len=1, num_rollouts=5, include_final=True, replace=False):
+    def get_batch(self, batchsize=5, replace=False):
         # TODO: check if we can get rid of num_enc_len and num_rollouts (call it batchsize instead)
 
-        num_rollouts = min(self.buffer_len, num_rollouts)
+        batchsize = min(self.buffer_len, batchsize)
 
         # select the indices for the processes from which we pick
-        rollout_indices = np.random.choice(range(self.buffer_len), num_rollouts, replace=replace)
+        rollout_indices = np.random.choice(range(self.buffer_len), batchsize, replace=replace)
         # trajectory length of the individual rollouts we picked
         trajectory_lens = np.array(self.trajectory_lens)[rollout_indices]
 
@@ -187,13 +187,5 @@ class RolloutStorageVAE(object):
         else:
             tasks = None
 
-        # choose where to chop up the trajectories
-        if num_enc_len is not None:
-            replace = num_enc_len <= self.buffer_len
-            len_encoder = np.stack(
-                [np.random.choice(range(0, t + int(include_final)), num_enc_len, replace=replace) for t in trajectory_lens])
-        else:
-            len_encoder = np.stack([range(0, t + 1) for t in trajectory_lens])
-
         return prev_obs.to(device), next_obs.to(device), actions.to(device), \
-               rewards.to(device), tasks, len_encoder, trajectory_lens
+               rewards.to(device), tasks, trajectory_lens
