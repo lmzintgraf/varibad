@@ -7,7 +7,7 @@ def get_args(rest_args):
 
     # --- GENERAL ---
 
-    parser.add_argument('--num_frames', type=int, default=1e8, help='number of frames to train')
+    parser.add_argument('--num_frames', type=int, default=5e7, help='number of frames to train')
     parser.add_argument('--max_rollouts_per_task', type=int, default=1)
     parser.add_argument('--exp_label', default='oracle', help='label for the experiment')
     parser.add_argument('--env_name', default='HalfCheetahDir-v0', help='environment to train on')
@@ -24,10 +24,10 @@ def get_args(rest_args):
     parser.add_argument('--pass_task_to_policy', type=boolean_argument, default=True, help='condition policy on ground-truth task description')
 
     # using separate encoders for the different inputs ("None" uses no encoder)
-    parser.add_argument('--policy_state_embedding_dim', type=int, default=32)
+    parser.add_argument('--policy_state_embedding_dim', type=int, default=64)
     parser.add_argument('--policy_latent_embedding_dim', type=int, default=None)
     parser.add_argument('--policy_belief_embedding_dim', type=int, default=None)
-    parser.add_argument('--policy_task_embedding_dim', type=int, default=32)
+    parser.add_argument('--policy_task_embedding_dim', type=int, default=64)
 
     # normalising (inputs/rewards/outputs)
     parser.add_argument('--norm_state_for_policy', type=boolean_argument, default=True, help='normalise state input')
@@ -48,7 +48,7 @@ def get_args(rest_args):
     parser.add_argument('--policy_optimiser', type=str, default='adam', help='choose: rmsprop, adam')
 
     # PPO specific
-    parser.add_argument('--ppo_num_epochs', type=int, default=2, help='number of epochs per PPO update')
+    parser.add_argument('--ppo_num_epochs', type=int, default=16, help='number of epochs per PPO update')
     parser.add_argument('--ppo_num_minibatch', type=int, default=4, help='number of minibatches to split the data')
     parser.add_argument('--ppo_use_huberloss', type=boolean_argument, default=True, help='use huberloss instead of MSE')
     parser.add_argument('--ppo_use_clipped_value_loss', type=boolean_argument, default=True, help='clip value loss')
@@ -58,7 +58,7 @@ def get_args(rest_args):
     parser.add_argument('--lr_policy', type=float, default=7e-4, help='learning rate (default: 7e-4)')
     parser.add_argument('--num_processes', type=int, default=16,
                         help='how many training CPU processes / parallel environments to use (default: 16)')
-    parser.add_argument('--policy_num_steps', type=int, default=200,
+    parser.add_argument('--policy_num_steps', type=int, default=800,
                         help='number of env steps to do (per process) before updating')
     parser.add_argument('--policy_eps', type=float, default=1e-8, help='optimizer epsilon (1e-8 for ppo, 1e-5 for a2c)')
     parser.add_argument('--policy_init_std', type=float, default=1.0, help='only used for continuous actions')
