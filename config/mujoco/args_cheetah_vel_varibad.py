@@ -45,7 +45,7 @@ def get_args(rest_args):
     parser.add_argument('--policy_optimiser', type=str, default='adam', help='choose: rmsprop, adam')
 
     # PPO specific
-    parser.add_argument('--ppo_num_epochs', type=int, default=2, help='number of epochs per PPO update')
+    parser.add_argument('--ppo_num_epochs', type=int, default=16, help='number of epochs per PPO update')
     parser.add_argument('--ppo_num_minibatch', type=int, default=4, help='number of minibatches to split the data')
     parser.add_argument('--ppo_use_huberloss', type=boolean_argument, default=True, help='use huberloss instead of MSE')
     parser.add_argument('--ppo_use_clipped_value_loss', type=boolean_argument, default=True, help='clip value loss')
@@ -55,7 +55,7 @@ def get_args(rest_args):
     parser.add_argument('--lr_policy', type=float, default=7e-4, help='learning rate (default: 7e-4)')
     parser.add_argument('--num_processes', type=int, default=16,
                         help='how many training CPU processes / parallel environments to use (default: 16)')
-    parser.add_argument('--policy_num_steps', type=int, default=200,
+    parser.add_argument('--policy_num_steps', type=int, default=800,
                         help='number of env steps to do (per process) before updating')
     parser.add_argument('--policy_eps', type=float, default=1e-8, help='optimizer epsilon (1e-8 for ppo, 1e-5 for a2c)')
     parser.add_argument('--policy_init_std', type=float, default=1.0, help='only used for continuous actions')

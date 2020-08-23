@@ -9,8 +9,8 @@ def get_args(rest_args):
 
     parser.add_argument('--num_frames', type=int, default=5e7, help='number of frames to train')
     parser.add_argument('--max_rollouts_per_task', type=int, default=1)
-    parser.add_argument('--exp_label', default='oracle', help='label for the experiment')
-    parser.add_argument('--env_name', default='HopperRandParams-v0', help='environment to train on')
+    parser.add_argument('--exp_label', default='avg', help='label for the experiment')
+    parser.add_argument('--env_name', default='Walker2DRandParams-v0', help='environment to train on')
 
     parser.add_argument('--disable_metalearner', type=boolean_argument, default=True,
                         help='Train a normal policy without the variBAD architecture')
@@ -21,13 +21,13 @@ def get_args(rest_args):
     parser.add_argument('--pass_state_to_policy', type=boolean_argument, default=True, help='condition policy on state')
     parser.add_argument('--pass_latent_to_policy', type=boolean_argument, default=False, help='condition policy on VAE latent')
     parser.add_argument('--pass_belief_to_policy', type=boolean_argument, default=False, help='condition policy on ground-truth belief')
-    parser.add_argument('--pass_task_to_policy', type=boolean_argument, default=True, help='condition policy on ground-truth task description')
+    parser.add_argument('--pass_task_to_policy', type=boolean_argument, default=False, help='condition policy on ground-truth task description')
 
     # using separate encoders for the different inputs ("None" uses no encoder)
-    parser.add_argument('--policy_state_embedding_dim', type=int, default=64)
+    parser.add_argument('--policy_state_embedding_dim', type=int, default=None)
     parser.add_argument('--policy_latent_embedding_dim', type=int, default=None)
     parser.add_argument('--policy_belief_embedding_dim', type=int, default=None)
-    parser.add_argument('--policy_task_embedding_dim', type=int, default=64)
+    parser.add_argument('--policy_task_embedding_dim', type=int, default=None)
 
     # normalising (inputs/rewards/outputs)
     parser.add_argument('--norm_state_for_policy', type=boolean_argument, default=True, help='normalise state input')
