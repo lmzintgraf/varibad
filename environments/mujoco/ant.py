@@ -207,7 +207,7 @@ class AntEnv(MujocoEnv):
 
             curr_task = env.get_task()
             plt.title('task: {}'.format(curr_task), fontsize=15)
-            if args.env_name == 'AntGoal-v0':
+            if 'Goal' in args.env_name:
                 plt.plot(curr_task[0], curr_task[1], 'rx')
 
             plt.ylabel('y-position (ep {})'.format(i), fontsize=15)
