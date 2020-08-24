@@ -93,7 +93,7 @@ def get_args(rest_args):
                         help='Average reconstruction terms (instead of sum)')
     parser.add_argument('--num_vae_updates', type=int, default=1,
                         help='how many VAE update steps to take per meta-iteration')
-    parser.add_argument('--pretrain_len', type=int, default=0, help='for how many updates to pre-train the VAE')
+    parser.add_argument('--pretrain_len', type=int, default=5, help='for how many updates to pre-train the VAE')
     parser.add_argument('--kl_weight', type=float, default=0.1, help='weight for the KL term')
 
     parser.add_argument('--split_batches_by_task', type=boolean_argument, default=False,
