@@ -33,7 +33,7 @@ def get_args(rest_args):
     parser.add_argument('--norm_state_for_policy', type=boolean_argument, default=True, help='normalise state input')
     parser.add_argument('--norm_latent_for_policy', type=boolean_argument, default=True, help='normalise latent input')
     parser.add_argument('--norm_belief_for_policy', type=boolean_argument, default=True, help='normalise belief input')
-    parser.add_argument('--norm_task_for_policy', type=boolean_argument, default=False, help='normalise task input')
+    parser.add_argument('--norm_task_for_policy', type=boolean_argument, default=True, help='normalise task input')
     parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=True, help='normalise rew for RL train')
     parser.add_argument('--norm_actions_of_policy', type=boolean_argument, default=False, help='normalise policy output')
 
