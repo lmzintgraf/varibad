@@ -74,12 +74,11 @@ to learn the posterior distribution in a supervised way.
 (Note that our implementation is based on the variBAD architecture, 
 so differs slightly from theirs.)
 - The size of the latent dimension can be changed using `--latent_dim`.
-- In our experience, the performance of PPO depends a lot on the number of 
-minibatches (`--ppo_num_minibatch`), 
-the clip parameter (`--ppo_clip_param`, we suggest values between 0.01 and 0.3),
+- In our experience, the performance of PPO depends a lot on 
+the number of minibatches (`--ppo_num_minibatch`),
+the number of epochs (`ppo_num_epochs`),
 and the batchsize (change with `--policy_num_steps` and/or `--num_processes`).
-Another important parameter is the kl term (`--kl_weight`) for the ELBO term.
-
+Another important parameter is the weight of the kl term (`--kl_weight`) in the ELBO.
 
 ### Comments
 

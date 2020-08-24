@@ -55,8 +55,8 @@ class VariBadWrapper(gym.Wrapper):
                     raise ValueError  # can't add additional info for obs of more than 1D
                 self.observation_space = spaces.Box(low=np.array([*self.observation_space.low, 0]),
                                                     # shape will be deduced from this
-                                                    high=np.array([*self.observation_space.high, 1]),
-                                                    dtype=np.float32)
+                                                    high=np.array([*self.observation_space.high, 1])
+                                                    )
             else:
                 # TODO: add something simliar for the other possible spaces,
                 # "Space", "Discrete", "MultiDiscrete", "MultiBinary", "Tuple", "Dict", "flatdim", "flatten", "unflatten"
