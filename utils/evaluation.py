@@ -25,10 +25,9 @@ def evaluate(args,
     # --- set up the things we want to log ---
 
     # for each process, we log the returns during the first, second, ... episode
-    # (such that we have a minium of [num_episodes]; the last column is for
+    # (such that we have a minimum of [num_episodes]; the last column is for
     #  any overflow and will be discarded at the end, because we need to wait until
     #  all processes have at least [num_episodes] many episodes)
-
     returns_per_episode = torch.zeros((num_processes, num_episodes + 1)).to(device)
 
     # --- initialise environments and latents ---

@@ -43,8 +43,8 @@ class MetaLearner:
                                   )
 
         # calculate what the maximum length of the trajectories is
-        args.max_trajectory_len = self.envs._max_episode_steps
-        args.max_trajectory_len *= self.args.max_rollouts_per_task
+        self.args.max_trajectory_len = self.envs._max_episode_steps
+        self.args.max_trajectory_len *= self.args.max_rollouts_per_task
 
         # get policy input dimensions
         self.args.state_dim = self.envs.observation_space.shape[0]
@@ -277,9 +277,8 @@ class MetaLearner:
 
                     # log
                     run_stats = [action, action_log_prob, value]
-                    if train_stats is not None:
-                        with torch.no_grad():
-                            self.log(run_stats, train_stats, start_time)
+                    with torch.no_grad():
+                        self.log(run_stats, train_stats, start_time)
 
             # clean up after update
             self.policy_storage.after_update()
@@ -319,37 +318,28 @@ class MetaLearner:
         Here the policy is updated for good average performance across tasks.
         :return:
         """
-        # update policy (if we are not pre-training, have enough data in the vae buffer, and are not at iteration 0)
-        if self.iter_idx >= self.args.pretrain_len and self.iter_idx > 0:
+        # bootstrap next value prediction
+        with torch.no_grad():
+            next_value = self.get_value(state=state,
+                                        belief=belief,
+                                        task=task,
+                                        latent_sample=latent_sample,
+                                        latent_mean=latent_mean,
+                                        latent_logvar=latent_logvar)
 
-            # bootstrap next value prediction
-            with torch.no_grad():
-                next_value = self.get_value(state=state,
-                                            belief=belief,
-                                            task=task,
-                                            latent_sample=latent_sample,
-                                            latent_mean=latent_mean,
-                                            latent_logvar=latent_logvar)
+        # compute returns for current rollouts
+        self.policy_storage.compute_returns(next_value, self.args.policy_use_gae, self.args.policy_gamma,
+                                            self.args.policy_tau,
+                                            use_proper_time_limits=self.args.use_proper_time_limits)
 
-            # compute returns for current rollouts
-            self.policy_storage.compute_returns(next_value, self.args.policy_use_gae, self.args.policy_gamma,
-                                                self.args.policy_tau,
-                                                use_proper_time_limits=self.args.use_proper_time_limits)
+        # update agent (this will also call the VAE update!)
+        policy_train_stats = self.policy.update(
+            policy_storage=self.policy_storage,
+            encoder=self.vae.encoder,
+            rlloss_through_encoder=self.args.rlloss_through_encoder,
+            compute_vae_loss=self.vae.compute_vae_loss)
 
-            # update agent (this will also call the VAE update!)
-            policy_train_stats = self.policy.update(
-                policy_storage=self.policy_storage,
-                encoder=self.vae.encoder,
-                rlloss_through_encoder=self.args.rlloss_through_encoder,
-                compute_vae_loss=self.vae.compute_vae_loss)
-        else:
-            policy_train_stats = 0, 0, 0, 0
-
-            # pre-train the VAE
-            if self.iter_idx < self.args.pretrain_len:
-                self.vae.compute_vae_loss(update=True)
-
-        return policy_train_stats, None
+        return policy_train_stats
 
     def log(self, run_stats, train_stats, start_time):
 
@@ -434,8 +424,6 @@ class MetaLearner:
         # --- log some other things ---
 
         if (self.iter_idx % self.args.log_interval == 0) and (train_stats is not None):
-
-            train_stats, _ = train_stats
 
             self.logger.add('policy_losses/value_loss', train_stats[0], self.iter_idx)
             self.logger.add('policy_losses/action_loss', train_stats[1], self.iter_idx)

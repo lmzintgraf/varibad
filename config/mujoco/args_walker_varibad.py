@@ -102,16 +102,16 @@ def get_args(rest_args):
                         help='split batches up by elbo term (to save memory of if ELBOs are of different length)')
 
     # - encoder
-    parser.add_argument('--action_embedding_size', type=int, default=16)
+    parser.add_argument('--action_embedding_size', type=int, default=32)
     parser.add_argument('--state_embedding_size', type=int, default=32)
-    parser.add_argument('--reward_embedding_size', type=int, default=16)
+    parser.add_argument('--reward_embedding_size', type=int, default=32)
     parser.add_argument('--encoder_layers_before_gru', nargs='+', type=int, default=[])
     parser.add_argument('--encoder_gru_hidden_size', type=int, default=128, help='dimensionality of RNN hidden state')
     parser.add_argument('--encoder_layers_after_gru', nargs='+', type=int, default=[])
     parser.add_argument('--latent_dim', type=int, default=10, help='dimensionality of latent space')
 
     # - decoder: rewards
-    parser.add_argument('--decode_reward', type=boolean_argument, default=True, help='use reward decoder')
+    parser.add_argument('--decode_reward', type=boolean_argument, default=False, help='use reward decoder')
     parser.add_argument('--rew_loss_coeff', type=float, default=1.0, help='weight for state loss (vs reward loss)')
     parser.add_argument('--input_prev_state', type=boolean_argument, default=True, help='use prev state for rew pred')
     parser.add_argument('--input_action', type=boolean_argument, default=True, help='use prev action for rew pred')
@@ -125,7 +125,7 @@ def get_args(rest_args):
                              'deterministic (treat as regression problem)')
 
     # - decoder: state transitions
-    parser.add_argument('--decode_state', type=boolean_argument, default=False, help='use state decoder')
+    parser.add_argument('--decode_state', type=boolean_argument, default=True, help='use state decoder')
     parser.add_argument('--state_loss_coeff', type=float, default=1.0, help='weight for state loss')
     parser.add_argument('--state_decoder_layers', nargs='+', type=int, default=[256, 128])
     parser.add_argument('--state_pred_type', type=str, default='deterministic', help='choose: deterministic, gaussian')

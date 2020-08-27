@@ -131,6 +131,8 @@ def update_encoding(encoder, next_obs, action, reward, done, hidden_state):
                                                                           hidden_state=hidden_state,
                                                                           return_prior=False)
 
+    # TODO: move the sampling out of the encoder!
+
     return latent_sample, latent_mean, latent_logvar, hidden_state
 
 
