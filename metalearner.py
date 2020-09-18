@@ -226,7 +226,8 @@ class MetaLearner:
                 # reset environments that are done
                 done_indices = np.argwhere(done.cpu().flatten()).flatten()
                 if len(done_indices) > 0:
-                    next_state, belief, task = utl.reset_env(self.envs, self.args, done_indices, next_state)
+                    next_state, belief, task = utl.reset_env(self.envs, self.args,
+                                                             indices=done_indices, state=next_state)
 
                 # TODO: deal with resampling for posterior sampling algorithm
                 #     latent_sample = latent_sample

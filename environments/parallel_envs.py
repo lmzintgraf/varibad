@@ -69,12 +69,12 @@ class VecPyTorch(VecEnvWrapper):
     def reset(self, index=None, task=None):
         if task is not None:
             assert isinstance(task, list)
-        obs = self.venv.reset(index=index, task=task)
-        if isinstance(obs, list):
-            obs = [torch.from_numpy(o).float().to(self.device) for o in obs]
+        state = self.venv.reset(index=index, task=task)
+        if isinstance(state, list):
+            state = [torch.from_numpy(s).float().to(self.device) for s in state]
         else:
-            obs = torch.from_numpy(obs).float().to(self.device)
-        return obs
+            state = torch.from_numpy(state).float().to(self.device)
+        return state
 
     def step_async(self, actions):
         # actions = actions.squeeze(1).cpu().numpy()
@@ -82,16 +82,16 @@ class VecPyTorch(VecEnvWrapper):
         self.venv.step_async(actions)
 
     def step_wait(self):
-        obs, reward, done, info = self.venv.step_wait()
-        if isinstance(obs, list):  # raw + normalised
-            obs = [torch.from_numpy(o).float().to(self.device) for o in obs]
+        state, reward, done, info = self.venv.step_wait()
+        if isinstance(state, list):  # raw + normalised
+            state = [torch.from_numpy(s).float().to(self.device) for s in state]
         else:
-            obs = torch.from_numpy(obs).float().to(self.device)
+            state = torch.from_numpy(state).float().to(self.device)
         if isinstance(reward, list):  # raw + normalised
             reward = [torch.from_numpy(r).unsqueeze(dim=1).float().to(self.device) for r in reward]
         else:
             reward = torch.from_numpy(reward).unsqueeze(dim=1).float().to(self.device)
-        return obs, reward, done, info
+        return state, reward, done, info
 
     def __getattr__(self, attr):
         """ If env does not have the attribute then call the attribute in the wrapped_env """

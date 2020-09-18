@@ -186,7 +186,8 @@ class Learner:
                 # reset environments that are done
                 done_indices = np.argwhere(done.flatten()).flatten()
                 if len(done_indices) > 0:
-                    state, belief, task = utl.reset_env(self.envs, self.args, indices=done_indices, state=state)
+                    state, belief, task = utl.reset_env(self.envs, self.args,
+                                                        indices=done_indices, state=state)
 
                 # add experience to policy buffer
                 self.policy_storage.insert(

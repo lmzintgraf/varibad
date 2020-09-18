@@ -116,7 +116,7 @@ class A2C:
                 self.optimiser_vae.step()
 
         if (not rlloss_through_encoder) and (self.optimiser_vae is not None):
-            for _ in range(self.args.num_vae_updates - 1):
+            for _ in range(self.args.num_vae_updates):
                 compute_vae_loss(update=True)
 
         if self.lr_scheduler_policy is not None:

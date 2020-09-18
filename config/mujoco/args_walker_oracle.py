@@ -24,10 +24,10 @@ def get_args(rest_args):
     parser.add_argument('--pass_task_to_policy', type=boolean_argument, default=True, help='condition policy on ground-truth task description')
 
     # using separate encoders for the different inputs ("None" uses no encoder)
-    parser.add_argument('--policy_state_embedding_dim', type=int, default=64)
+    parser.add_argument('--policy_state_embedding_dim', type=int, default=128)
     parser.add_argument('--policy_latent_embedding_dim', type=int, default=None)
     parser.add_argument('--policy_belief_embedding_dim', type=int, default=None)
-    parser.add_argument('--policy_task_embedding_dim', type=int, default=64)
+    parser.add_argument('--policy_task_embedding_dim', type=int, default=128)
 
     # normalising (inputs/rewards/outputs)
     parser.add_argument('--norm_state_for_policy', type=boolean_argument, default=True, help='normalise state input')
@@ -38,7 +38,7 @@ def get_args(rest_args):
     parser.add_argument('--norm_actions_of_policy', type=boolean_argument, default=False, help='normalise policy output')
 
     # network
-    parser.add_argument('--policy_layers', nargs='+', default=[128, 128])
+    parser.add_argument('--policy_layers', nargs='+', default=[256, 128])
     parser.add_argument('--policy_activation_function', type=str, default='tanh', help='tanh/relu/leaky-relu')
     parser.add_argument('--policy_initialisation', type=str, default='normc', help='normc/orthogonal')
     parser.add_argument('--policy_anneal_lr', type=boolean_argument, default=False)

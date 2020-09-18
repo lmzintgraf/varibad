@@ -234,15 +234,12 @@ class FeatureExtractor(nn.Module):
 
 
 def sample_gaussian(mu, logvar, num=None):
-    if num is None:
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        return eps.mul(std).add_(mu)
-    else:
-        std = torch.exp(0.5 * logvar).repeat(num, 1)
-        eps = torch.randn_like(std)
+    std = torch.exp(0.5 * logvar)
+    if num is not None:
+        std = std.repeat(num, 1)
         mu = mu.repeat(num, 1)
-        return eps.mul(std).add_(mu)
+    eps = torch.randn_like(std)
+    return mu + std * eps
 
 
 def save_obj(obj, folder, name):

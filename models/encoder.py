@@ -23,18 +23,12 @@ class RNNEncoder(nn.Module):
                  state_embed_dim=10,
                  reward_size=1,
                  reward_embed_size=5,
-                 #
-                 distribution='gaussian',
                  ):
         super(RNNEncoder, self).__init__()
 
         self.latent_dim = latent_dim
         self.hidden_size = hidden_size
-
-        if distribution == 'gaussian':
-            self.reparameterise = self._sample_gaussian
-        else:
-            raise NotImplementedError
+        self.reparameterise = self._sample_gaussian
 
         # embed action, state, reward
         self.state_encoder = utl.FeatureExtractor(state_dim, state_embed_dim, F.relu)
