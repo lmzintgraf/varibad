@@ -9,9 +9,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class StateTransitionDecoder(nn.Module):
     def __init__(self,
-                 latent_dim,
                  layers,
-                 #
+                 latent_dim,
                  action_dim,
                  action_embed_dim,
                  state_dim,
@@ -99,7 +98,7 @@ class RewardDecoder(nn.Module):
 
         if self.multi_head:
             h = latent_state.clone()
-        if not self.multi_head:
+        else:
             hns = self.state_encoder(next_state)
             h = torch.cat((latent_state, hns), dim=-1)
             if self.input_action:
@@ -112,17 +111,7 @@ class RewardDecoder(nn.Module):
         for i in range(len(self.fc_layers)):
             h = F.relu(self.fc_layers[i](h))
 
-        p_x = self.fc_out(h)
-        if self.pred_type == 'deterministic' or self.pred_type == 'gaussian':
-            pass
-        elif self.pred_type == 'bernoulli':
-            p_x = torch.sigmoid(p_x)
-        elif self.pred_type == 'categorical':
-            p_x = torch.softmax(p_x, 1)
-        else:
-            raise NotImplementedError
-
-        return p_x
+        return self.fc_out(h)
 
 
 class TaskDecoder(nn.Module):
@@ -131,6 +120,7 @@ class TaskDecoder(nn.Module):
                  latent_dim,
                  pred_type,
                  task_dim,
+                 num_tasks,
                  ):
         super(TaskDecoder, self).__init__()
 
@@ -143,7 +133,8 @@ class TaskDecoder(nn.Module):
             self.fc_layers.append(nn.Linear(curr_input_dim, layers[i]))
             curr_input_dim = layers[i]
 
-        self.fc_out = nn.Linear(curr_input_dim, task_dim)
+        output_dim = task_dim if pred_type == 'task_description' else num_tasks
+        self.fc_out = nn.Linear(curr_input_dim, output_dim)
 
     def forward(self, latent_state):
 
@@ -152,9 +143,4 @@ class TaskDecoder(nn.Module):
         for i in range(len(self.fc_layers)):
             h = F.relu(self.fc_layers[i](h))
 
-        y = self.fc_out(h)
-
-        if self.pred_type == 'task_id':
-            y = torch.softmax(y, 1)
-
-        return y
+        return self.fc_out(h)

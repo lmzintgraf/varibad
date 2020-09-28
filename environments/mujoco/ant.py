@@ -65,7 +65,6 @@ class AntEnv(MujocoEnv):
         if task is None:
             task = self.sample_tasks(1)[0]
         self.set_task(task)
-        # self.reset()
 
     @staticmethod
     def visualise_behaviour(env,
@@ -102,10 +101,9 @@ class AntEnv(MujocoEnv):
 
         # (re)set environment
         env.reset_task()
-        (obs_raw, obs_normalised) = env.reset()
-        obs_raw = obs_raw.float().reshape((1, -1)).to(device)
-        obs_normalised = obs_normalised.float().reshape((1, -1)).to(device)
-        start_obs_raw = obs_raw.clone()
+        state, belief, task = utl.reset_env(env, args)
+        start_obs_raw = state.clone()
+        task = task.view(-1) if task is not None else None
 
         # initialise actions and rewards (used as initial input to policy if we have a recurrent policy)
         if hasattr(args, 'hidden_size'):
@@ -114,7 +112,6 @@ class AntEnv(MujocoEnv):
             hidden_state = None
 
         # keep track of what task we're in and the position of the cheetah
-        task = env.get_task()
         pos = [[] for _ in range(args.max_rollouts_per_task)]
         start_pos = unwrapped_env.get_body_com("torso")[:2].copy()
 
@@ -143,17 +140,18 @@ class AntEnv(MujocoEnv):
                 if step_idx == 1:
                     episode_prev_obs[episode_idx].append(start_obs_raw.clone())
                 else:
-                    episode_prev_obs[episode_idx].append(obs_raw.clone())
+                    episode_prev_obs[episode_idx].append(state.clone())
                 # act
-                o_aug = utl.get_augmented_obs(args,
-                                              obs_normalised if args.norm_obs_for_policy else obs_raw,
-                                              curr_latent_sample, curr_latent_mean,
-                                              curr_latent_logvar)
-                _, action, _ = policy.act(o_aug, deterministic=True)
+                latent = utl.get_latent_for_policy(args,
+                                                   latent_sample=curr_latent_sample,
+                                                   latent_mean=curr_latent_mean,
+                                                   latent_logvar=curr_latent_logvar)
+                _, action, _ = policy.act(state=state.view(-1), latent=latent, belief=belief, task=task,
+                                          deterministic=True)
 
-                (obs_raw, obs_normalised), (rew_raw, rew_normalised), done, info = env.step(action.cpu().detach())
-                obs_raw = obs_raw.float().reshape((1, -1)).to(device)
-                obs_normalised = obs_normalised.float().reshape((1, -1)).to(device)
+                (state, belief, task), (rew, rew_normalised), done, info = utl.env_step(env, action, args)
+                state = state.float().reshape((1, -1)).to(device)
+                task = task.view(-1) if task is not None else None
 
                 # keep track of position
                 pos[episode_idx].append(unwrapped_env.get_body_com("torso")[:2].copy())
@@ -161,18 +159,15 @@ class AntEnv(MujocoEnv):
                 if encoder is not None:
                     # update task embedding
                     curr_latent_sample, curr_latent_mean, curr_latent_logvar, hidden_state = encoder(
-                        action.float().to(device),
-                        obs_raw,
-                        rew_raw.reshape((1, 1)).float().to(device),
-                        hidden_state,
-                        return_prior=False)
+                        action.reshape(1, -1).float().to(device), state, rew.reshape(1, -1).float().to(device),
+                        hidden_state, return_prior=False)
 
                     episode_latent_samples[episode_idx].append(curr_latent_sample[0].clone())
                     episode_latent_means[episode_idx].append(curr_latent_mean[0].clone())
                     episode_latent_logvars[episode_idx].append(curr_latent_logvar[0].clone())
 
-                episode_next_obs[episode_idx].append(obs_raw.clone())
-                episode_rewards[episode_idx].append(rew_raw.clone())
+                episode_next_obs[episode_idx].append(state.clone())
+                episode_rewards[episode_idx].append(rew.clone())
                 episode_actions[episode_idx].append(action.clone())
 
                 if info[0]['done_mdp'] and not done:
@@ -191,7 +186,7 @@ class AntEnv(MujocoEnv):
 
         episode_prev_obs = [torch.cat(e) for e in episode_prev_obs]
         episode_next_obs = [torch.cat(e) for e in episode_next_obs]
-        episode_actions = [torch.cat(e) for e in episode_actions]
+        episode_actions = [torch.stack(e) for e in episode_actions]
         episode_rewards = [torch.cat(e) for e in episode_rewards]
 
         # plot the movement of the ant
@@ -210,9 +205,10 @@ class AntEnv(MujocoEnv):
 
             plt.scatter(x, y, 1, 'g')
 
-            plt.title('task: {}'.format(task), fontsize=15)
-            if args.env_name == 'AntGoal-v0':
-                plt.plot(task[0], task[1], 'rx')
+            curr_task = env.get_task()
+            plt.title('task: {}'.format(curr_task), fontsize=15)
+            if 'Goal' in args.env_name:
+                plt.plot(curr_task[0], curr_task[1], 'rx')
 
             plt.ylabel('y-position (ep {})'.format(i), fontsize=15)
 

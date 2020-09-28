@@ -44,7 +44,6 @@ class MetaEnv(Env):
         if task is None:
             task = self.sample_tasks(1)[0]
         self.set_task(task)
-        # self.reset()
 
     def log_diagnostics(self, paths, prefix):
         """
@@ -75,6 +74,7 @@ class RandomEnv(MetaEnv, MujocoEnv):
         assert set(rand_params) <= set(self.RAND_PARAMS_EXTENDED), \
             "rand_params must be a subset of " + str(self.RAND_PARAMS_EXTENDED)
         self.save_parameters()
+        self.task_dim = self.rand_param_dim
 
     def sample_tasks(self, n_tasks):
         """
@@ -132,12 +132,12 @@ class RandomEnv(MetaEnv, MujocoEnv):
         self.curr_params = task
 
     def get_task(self):
-        try:
+        if hasattr(self, 'curr_params'):
             task = self.curr_params
-            task = np.concatenate([task[k].reshape(-1) for k in task.keys()])[:, np.newaxis]
-            return task
-        except AttributeError:
-            return None
+            task = np.concatenate([task[k].reshape(-1) for k in task.keys()])
+        else:
+            task = np.zeros(self.rand_param_dim)
+        return task
 
     def save_parameters(self):
         self.init_params = {}

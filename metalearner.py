@@ -22,12 +22,13 @@ class MetaLearner:
     """
     Meta-Learner class with the main training loop for variBAD.
     """
-
     def __init__(self, args):
+
         self.args = args
         utl.seed(self.args.seed, self.args.deterministic_execution)
 
-        # count number of frames and number of meta-iterations
+        # calculate number of updates and keep count of frames/iterations
+        self.num_updates = int(args.num_frames) // args.policy_num_steps // args.num_processes
         self.frames = 0
         self.iter_idx = 0
 
@@ -36,49 +37,46 @@ class MetaLearner:
 
         # initialise environments
         self.envs = make_vec_envs(env_name=args.env_name, seed=args.seed, num_processes=args.num_processes,
-                                  gamma=args.policy_gamma, log_dir=args.agent_log_dir, device=device,
-                                  allow_early_resets=False,
+                                  gamma=args.policy_gamma, device=device,
                                   episodes_per_task=self.args.max_rollouts_per_task,
-                                  obs_rms=None, ret_rms=None,
+                                  normalise_rew=args.norm_rew_for_policy, ret_rms=None,
                                   )
 
         # calculate what the maximum length of the trajectories is
-        args.max_trajectory_len = self.envs._max_episode_steps
-        args.max_trajectory_len *= self.args.max_rollouts_per_task
+        self.args.max_trajectory_len = self.envs._max_episode_steps
+        self.args.max_trajectory_len *= self.args.max_rollouts_per_task
 
-        # calculate number of meta updates
-        self.args.num_updates = int(args.num_frames) // args.policy_num_steps // args.num_processes
-
-        # get action / observation dimensions
+        # get policy input dimensions
+        self.args.state_dim = self.envs.observation_space.shape[0]
+        self.args.task_dim = self.envs.task_dim
+        self.args.belief_dim = self.envs.belief_dim
+        self.args.num_states = self.envs.num_states
+        # get policy output (action) dimensions
+        self.args.action_space = self.envs.action_space
         if isinstance(self.envs.action_space, gym.spaces.discrete.Discrete):
             self.args.action_dim = 1
         else:
             self.args.action_dim = self.envs.action_space.shape[0]
-        self.args.obs_dim = self.envs.observation_space.shape[0]
-        self.args.num_states = self.envs.num_states if str.startswith(self.args.env_name, 'Grid') else None
-        self.args.act_space = self.envs.action_space
 
+        # initialise VAE and policy
         self.vae = VaribadVAE(self.args, self.logger, lambda: self.iter_idx)
+        self.policy_storage = self.initialise_policy_storage()
+        self.policy = self.initialise_policy()
 
-        self.initialise_policy()
+    def initialise_policy_storage(self):
+        return OnlineStorage(args=self.args,
+                             num_steps=self.args.policy_num_steps,
+                             num_processes=self.args.num_processes,
+                             state_dim=self.args.state_dim,
+                             latent_dim=self.args.latent_dim,
+                             belief_dim=self.args.belief_dim,
+                             task_dim=self.args.task_dim,
+                             action_space=self.args.action_space,
+                             hidden_size=self.args.encoder_gru_hidden_size,
+                             normalise_rewards=self.args.norm_rew_for_policy,
+                             )
 
     def initialise_policy(self):
-
-        # initialise rollout storage for the policy
-        self.policy_storage = OnlineStorage(self.args,
-                                            self.args.policy_num_steps,
-                                            self.args.num_processes,
-                                            self.args.obs_dim,
-                                            self.args.act_space,
-                                            hidden_size=self.args.aggregator_hidden_size,
-                                            latent_dim=self.args.latent_dim,
-                                            normalise_observations=self.args.norm_obs_for_policy,
-                                            normalise_rewards=self.args.norm_rew_for_policy,
-                                            )
-
-        # initialise policy network
-        input_dim = self.args.obs_dim * int(self.args.condition_policy_on_state)
-        input_dim += (1 + int(not self.args.sample_embeddings)) * self.args.latent_dim
 
         if hasattr(self.envs.action_space, 'low'):
             action_low = self.envs.action_space.low
@@ -86,34 +84,53 @@ class MetaLearner:
         else:
             action_low = action_high = None
 
+        # initialise policy network
         policy_net = Policy(
-            state_dim=input_dim,
-            action_space=self.args.act_space,
-            init_std=self.args.policy_init_std,
+            args=self.args,
+            #
+            pass_state_to_policy=self.args.pass_state_to_policy,
+            pass_latent_to_policy=self.args.pass_latent_to_policy,
+            pass_belief_to_policy=self.args.pass_belief_to_policy,
+            pass_task_to_policy=self.args.pass_task_to_policy,
+            dim_state=self.args.state_dim,
+            dim_latent=self.args.latent_dim * 2,
+            dim_belief=self.args.belief_dim,
+            dim_task=self.args.task_dim,
+            #
             hidden_layers=self.args.policy_layers,
             activation_function=self.args.policy_activation_function,
-            normalise_actions=self.args.normalise_actions,
+            policy_initialisation=self.args.policy_initialisation,
+            #
+            action_space=self.envs.action_space,
+            init_std=self.args.policy_init_std,
+            norm_actions_of_policy=self.args.norm_actions_of_policy,
             action_low=action_low,
             action_high=action_high,
         ).to(device)
 
         # initialise policy trainer
         if self.args.policy == 'a2c':
-            self.policy = A2C(
+            policy = A2C(
+                self.args,
                 policy_net,
                 self.args.policy_value_loss_coef,
                 self.args.policy_entropy_coef,
+                policy_optimiser=self.args.policy_optimiser,
+                policy_anneal_lr=self.args.policy_anneal_lr,
+                train_steps=self.num_updates,
                 optimiser_vae=self.vae.optimiser_vae,
                 lr=self.args.lr_policy,
                 eps=self.args.policy_eps,
-                alpha=self.args.a2c_alpha,
             )
         elif self.args.policy == 'ppo':
-            self.policy = PPO(
+            policy = PPO(
+                self.args,
                 policy_net,
                 self.args.policy_value_loss_coef,
                 self.args.policy_entropy_coef,
-                optimiser_vae=self.vae.optimiser_vae,
+                policy_optimiser=self.args.policy_optimiser,
+                policy_anneal_lr=self.args.policy_anneal_lr,
+                train_steps=self.num_updates,
                 lr=self.args.lr_policy,
                 eps=self.args.policy_eps,
                 ppo_epoch=self.args.ppo_num_epochs,
@@ -121,40 +138,36 @@ class MetaLearner:
                 use_huber_loss=self.args.ppo_use_huberloss,
                 use_clipped_value_loss=self.args.ppo_use_clipped_value_loss,
                 clip_param=self.args.ppo_clip_param,
+                optimiser_vae=self.vae.optimiser_vae,
             )
         else:
             raise NotImplementedError
 
-    def train(self):
-        """
-        Given some stream of environments and a logger (tensorboard),
-        (meta-)trains the policy.
-        """
+        return policy
 
+    def train(self):
+        """ Main Meta-Training loop """
         start_time = time.time()
 
         # reset environments
-        (prev_obs_raw, prev_obs_normalised) = self.envs.reset()
-        prev_obs_raw = prev_obs_raw.to(device)
-        prev_obs_normalised = prev_obs_normalised.to(device)
+        prev_state, belief, task = utl.reset_env(self.envs, self.args)
 
         # insert initial observation / embeddings to rollout storage
-        self.policy_storage.prev_obs_raw[0].copy_(prev_obs_raw)
-        self.policy_storage.prev_obs_normalised[0].copy_(prev_obs_normalised)
-        self.policy_storage.to(device)
+        self.policy_storage.prev_state[0].copy_(prev_state)
+
+        # log once before training
+        with torch.no_grad():
+            self.log(None, None, start_time)
 
         vae_is_pretrained = False
-        for self.iter_idx in range(self.args.num_updates):
+        for self.iter_idx in range(self.num_updates):
 
             # First, re-compute the hidden states given the current rollouts (since the VAE might've changed)
-            # compute latent embedding (will return prior if current trajectory is empty)
             with torch.no_grad():
                 latent_sample, latent_mean, latent_logvar, hidden_state = self.encode_running_trajectory()
 
-            # check if we flushed the policy storage
-            assert len(self.policy_storage.latent_mean) == 0
-
             # add this initial hidden state to the policy storage
+            assert len(self.policy_storage.latent_mean) == 0  # make sure we emptied buffers
             self.policy_storage.hidden_states[0].copy_(hidden_state)
             self.policy_storage.latent_samples.append(latent_sample.clone())
             self.policy_storage.latent_mean.append(latent_mean.clone())
@@ -168,63 +181,63 @@ class MetaLearner:
                     value, action, action_log_prob = utl.select_action(
                         args=self.args,
                         policy=self.policy,
-                        obs=prev_obs_normalised if self.args.norm_obs_for_policy else prev_obs_raw,
+                        state=prev_state,
+                        belief=belief,
+                        task=task,
                         deterministic=False,
                         latent_sample=latent_sample,
                         latent_mean=latent_mean,
                         latent_logvar=latent_logvar,
                     )
-                # observe reward and next obs
-                (next_obs_raw, next_obs_normalised), (rew_raw, rew_normalised), done, infos = utl.env_step(self.envs,
-                                                                                                           action)
-                tasks = torch.FloatTensor([info['task'] for info in infos]).to(device)
-                done = torch.from_numpy(np.array(done, dtype=int)).to(device).float().view((-1, 1))
 
+                # take step in the environment
+                [next_state, belief, task], (rew_raw, rew_normalised), done, infos = utl.env_step(self.envs, action, self.args)
+
+                done = torch.from_numpy(np.array(done, dtype=int)).to(device).float().view((-1, 1))
                 # create mask for episode ends
                 masks_done = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done]).to(device)
                 # bad_mask is true if episode ended because time limit was reached
-                bad_masks = torch.FloatTensor(
-                    [[0.0] if 'bad_transition' in info.keys() else [1.0] for info in infos]).to(device)
+                bad_masks = torch.FloatTensor([[0.0] if 'bad_transition' in info.keys() else [1.0] for info in infos]).to(device)
 
-                # compute next embedding (for next loop and/or value prediction bootstrap)
-                latent_sample, latent_mean, latent_logvar, hidden_state = utl.update_encoding(encoder=self.vae.encoder,
-                                                                                              next_obs=next_obs_raw,
-                                                                                              action=action,
-                                                                                              reward=rew_raw,
-                                                                                              done=done,
-                                                                                              hidden_state=hidden_state)
+                with torch.no_grad():
+                    # compute next embedding (for next loop and/or value prediction bootstrap)
+                    latent_sample, latent_mean, latent_logvar, hidden_state = utl.update_encoding(encoder=self.vae.encoder,
+                                                                                                  next_obs=next_state,
+                                                                                                  action=action,
+                                                                                                  reward=rew_raw,
+                                                                                                  done=done,
+                                                                                                  hidden_state=hidden_state)
 
                 # before resetting, update the embedding and add to vae buffer
                 # (last state might include useful task info)
                 if not (self.args.disable_decoder and self.args.disable_stochasticity_in_latent):
-                    self.vae.rollout_storage.insert(prev_obs_raw.clone(),
+                    self.vae.rollout_storage.insert(prev_state.clone(),
                                                     action.detach().clone(),
-                                                    next_obs_raw.clone(),
+                                                    next_state.clone(),
                                                     rew_raw.clone(),
                                                     done.clone(),
-                                                    tasks.clone())
+                                                    task.clone() if task is not None else None)
 
-                # add the obs before reset to the policy storage
-                # (only used to recompute embeddings if rlloss is backpropagated through encoder)
-                self.policy_storage.next_obs_raw[step] = next_obs_raw.clone()
-                self.policy_storage.next_obs_normalised[step] = next_obs_normalised.clone()
+                if self.args.rlloss_through_encoder:
+                    # add the obs before reset to the policy storage
+                    # (only used to recompute embeddings if rlloss is backpropagated through encoder)
+                    self.policy_storage.next_state[step] = next_state.clone()
 
                 # reset environments that are done
-                done_indices = np.argwhere(done.cpu().detach().flatten()).flatten()
-                if len(done_indices) == self.args.num_processes:
-                    [next_obs_raw, next_obs_normalised] = self.envs.reset()
-                    if not self.args.sample_embeddings:
-                        latent_sample = latent_sample
-                else:
-                    for i in done_indices:
-                        [next_obs_raw[i], next_obs_normalised[i]] = self.envs.reset(index=i)
-                        if not self.args.sample_embeddings:
-                            latent_sample[i] = latent_sample[i]
+                done_indices = np.argwhere(done.cpu().flatten()).flatten()
+                if len(done_indices) > 0:
+                    next_state, belief, task = utl.reset_env(self.envs, self.args,
+                                                             indices=done_indices, state=next_state)
 
-                # # add experience to policy buffer
+                # TODO: deal with resampling for posterior sampling algorithm
+                #     latent_sample = latent_sample
+                #     latent_sample[i] = latent_sample[i]
+
+                # add experience to policy buffer
                 self.policy_storage.insert(
-                    obs_raw=next_obs_raw,
-                    obs_normalised=next_obs_normalised,
+                    state=next_state,
+                    belief=belief,
+                    task=task,
                     actions=action,
                     action_log_probs=action_log_prob,
                     rewards_raw=rew_raw,
@@ -233,20 +246,20 @@ class MetaLearner:
                     masks=masks_done,
                     bad_masks=bad_masks,
                     done=done,
-                    hidden_states=hidden_state.squeeze(0).detach(),
-                    latent_sample=latent_sample.detach(),
-                    latent_mean=latent_mean.detach(),
-                    latent_logvar=latent_logvar.detach(),
+                    hidden_states=hidden_state.squeeze(0),
+                    latent_sample=latent_sample,
+                    latent_mean=latent_mean,
+                    latent_logvar=latent_logvar,
                 )
 
-                prev_obs_normalised = next_obs_normalised
-                prev_obs_raw = next_obs_raw
+                prev_state = next_state
 
                 self.frames += self.args.num_processes
 
             # --- UPDATE ---
 
             if self.args.precollect_len <= self.frames:
+
                 # check if we are pre-training the VAE
                 if self.args.pretrain_len > 0 and not vae_is_pretrained:
                     for _ in range(self.args.pretrain_len):
@@ -256,13 +269,16 @@ class MetaLearner:
                 # otherwise do the normal update (policy + vae)
                 else:
 
-                    train_stats = self.update(
-                        obs=prev_obs_normalised if self.args.norm_obs_for_policy else prev_obs_raw,
-                        latent_sample=latent_sample, latent_mean=latent_mean, latent_logvar=latent_logvar)
+                    train_stats = self.update(state=prev_state,
+                                              belief=belief,
+                                              task=task,
+                                              latent_sample=latent_sample,
+                                              latent_mean=latent_mean,
+                                              latent_logvar=latent_logvar)
 
                     # log
                     run_stats = [action, action_log_prob, value]
-                    if train_stats is not None:
+                    with torch.no_grad():
                         self.log(run_stats, train_stats, start_time)
 
             # clean up after update
@@ -286,68 +302,57 @@ class MetaLearner:
                                                                                                        return_prior=True)
 
         # get the embedding / hidden state of the current time step (need to do this since we zero-padded)
-        latent_sample = (torch.stack([all_latent_samples[lens[i]][i] for i in range(len(lens))])).detach().to(device)
-        latent_mean = (torch.stack([all_latent_means[lens[i]][i] for i in range(len(lens))])).detach().to(device)
-        latent_logvar = (torch.stack([all_latent_logvars[lens[i]][i] for i in range(len(lens))])).detach().to(device)
-        hidden_state = (torch.stack([all_hidden_states[lens[i]][i] for i in range(len(lens))])).detach().to(device)
+        latent_sample = (torch.stack([all_latent_samples[lens[i]][i] for i in range(len(lens))])).to(device)
+        latent_mean = (torch.stack([all_latent_means[lens[i]][i] for i in range(len(lens))])).to(device)
+        latent_logvar = (torch.stack([all_latent_logvars[lens[i]][i] for i in range(len(lens))])).to(device)
+        hidden_state = (torch.stack([all_hidden_states[lens[i]][i] for i in range(len(lens))])).to(device)
 
         return latent_sample, latent_mean, latent_logvar, hidden_state
 
-    def get_value(self, obs, latent_sample, latent_mean, latent_logvar):
-        obs = utl.get_augmented_obs(self.args, obs, latent_sample, latent_mean, latent_logvar)
-        return self.policy.actor_critic.get_value(obs).detach()
+    def get_value(self, state, belief, task, latent_sample, latent_mean, latent_logvar):
+        latent = utl.get_latent_for_policy(self.args, latent_sample=latent_sample, latent_mean=latent_mean, latent_logvar=latent_logvar)
+        return self.policy.actor_critic.get_value(state=state, belief=belief, task=task, latent=latent).detach()
 
-    def update(self, obs, latent_sample, latent_mean, latent_logvar):
+    def update(self, state, belief, task, latent_sample, latent_mean, latent_logvar):
         """
         Meta-update.
         Here the policy is updated for good average performance across tasks.
         :return:
         """
-        # update policy (if we are not pre-training, have enough data in the vae buffer, and are not at iteration 0)
-        if self.iter_idx >= self.args.pretrain_len and self.iter_idx > 0:
+        # bootstrap next value prediction
+        with torch.no_grad():
+            next_value = self.get_value(state=state,
+                                        belief=belief,
+                                        task=task,
+                                        latent_sample=latent_sample,
+                                        latent_mean=latent_mean,
+                                        latent_logvar=latent_logvar)
 
-            # bootstrap next value prediction
-            with torch.no_grad():
-                next_value = self.get_value(obs=obs,
-                                            latent_sample=latent_sample,
-                                            latent_mean=latent_mean,
-                                            latent_logvar=latent_logvar)
+        # compute returns for current rollouts
+        self.policy_storage.compute_returns(next_value, self.args.policy_use_gae, self.args.policy_gamma,
+                                            self.args.policy_tau,
+                                            use_proper_time_limits=self.args.use_proper_time_limits)
 
-            # compute returns for current rollouts
-            self.policy_storage.compute_returns(next_value, self.args.policy_use_gae, self.args.policy_gamma,
-                                                self.args.policy_tau,
-                                                use_proper_time_limits=self.args.use_proper_time_limits)
+        # update agent (this will also call the VAE update!)
+        policy_train_stats = self.policy.update(
+            policy_storage=self.policy_storage,
+            encoder=self.vae.encoder,
+            rlloss_through_encoder=self.args.rlloss_through_encoder,
+            compute_vae_loss=self.vae.compute_vae_loss)
 
-            # update agent (this will also call the VAE update!)
-            policy_train_stats = self.policy.update(
-                args=self.args,
-                policy_storage=self.policy_storage,
-                encoder=self.vae.encoder,
-                rlloss_through_encoder=self.args.rlloss_through_encoder,
-                compute_vae_loss=self.vae.compute_vae_loss)
-        else:
-            policy_train_stats = 0, 0, 0, 0
-
-            # pre-train the VAE
-            if self.iter_idx < self.args.pretrain_len:
-                self.vae.compute_vae_loss(update=True)
-
-        return policy_train_stats, None
+        return policy_train_stats
 
     def log(self, run_stats, train_stats, start_time):
-        train_stats, meta_train_stats = train_stats
 
         # --- visualise behaviour of policy ---
 
         if self.iter_idx % self.args.vis_interval == 0:
-            obs_rms = self.envs.venv.obs_rms if self.args.norm_obs_for_policy else None
-            ret_rms = self.envs.venv.ret_rms if self.args.norm_rew_for_policy else None
 
+            ret_rms = self.envs.venv.ret_rms if self.args.norm_rew_for_policy else None
             utl_eval.visualise_behaviour(args=self.args,
                                          policy=self.policy,
                                          image_folder=self.logger.full_output_folder,
                                          iter_idx=self.iter_idx,
-                                         obs_rms=obs_rms,
                                          ret_rms=ret_rms,
                                          encoder=self.vae.encoder,
                                          reward_decoder=self.vae.reward_decoder,
@@ -363,12 +368,9 @@ class MetaLearner:
 
         if self.iter_idx % self.args.eval_interval == 0:
 
-            obs_rms = self.envs.venv.obs_rms if self.args.norm_obs_for_policy else None
             ret_rms = self.envs.venv.ret_rms if self.args.norm_rew_for_policy else None
-
             returns_per_episode = utl_eval.evaluate(args=self.args,
                                                     policy=self.policy,
-                                                    obs_rms=obs_rms,
                                                     ret_rms=ret_rms,
                                                     encoder=self.vae.encoder,
                                                     iter_idx=self.iter_idx
@@ -383,9 +385,11 @@ class MetaLearner:
                 self.logger.add('return_std_per_iter/episode_{}'.format(k + 1), returns_std[k], self.iter_idx)
                 self.logger.add('return_std_per_frame/episode_{}'.format(k + 1), returns_std[k], self.frames)
 
-            print("Updates {}, num timesteps {}, FPS {}, {} \n Mean return (train): {:.5f} \n".
-                  format(self.iter_idx, self.frames, int(self.frames / (time.time() - start_time)),
-                         self.vae.rollout_storage.prev_obs.shape, returns_avg[-1].item()))
+            print(f"Updates {self.iter_idx}, "
+                  f"Frames {self.frames}, "
+                  f"FPS {int(self.frames / (time.time() - start_time))}, "
+                  f"\n Mean return (train): {returns_avg[-1].item()} \n"
+                  )
 
         # --- save models ---
 
@@ -393,28 +397,34 @@ class MetaLearner:
             save_path = os.path.join(self.logger.full_output_folder, 'models')
             if not os.path.exists(save_path):
                 os.mkdir(save_path)
-            torch.save(self.policy.actor_critic, os.path.join(save_path, "policy{0}.pt".format(self.iter_idx)))
-            torch.save(self.vae.encoder, os.path.join(save_path, "encoder{0}.pt".format(self.iter_idx)))
-            if self.vae.state_decoder is not None:
-                torch.save(self.vae.state_decoder, os.path.join(save_path, "state_decoder{0}.pt".format(self.iter_idx)))
-            if self.vae.reward_decoder is not None:
-                torch.save(self.vae.reward_decoder,
-                           os.path.join(save_path, "reward_decoder{0}.pt".format(self.iter_idx)))
-            if self.vae.task_decoder is not None:
-                torch.save(self.vae.task_decoder, os.path.join(save_path, "task_decoder{0}.pt".format(self.iter_idx)))
 
-            # save normalisation params of envs
-            if self.args.norm_rew_for_policy:
-                # save rolling mean and std
-                rew_rms = self.envs.venv.ret_rms
-                utl.save_obj(rew_rms, save_path, "env_rew_rms{0}.pkl".format(self.iter_idx))
-            if self.args.norm_obs_for_policy:
-                obs_rms = self.envs.venv.obs_rms
-                utl.save_obj(obs_rms, save_path, "env_obs_rms{0}.pkl".format(self.iter_idx))
+            idx_labels = ['']
+            if self.args.save_intermediate_models:
+                idx_labels.append(int(self.iter_idx))
 
-            # --- log some other things ---
+            for idx_label in idx_labels:
 
-        if self.iter_idx % self.args.log_interval == 0:
+                torch.save(self.policy.actor_critic, os.path.join(save_path, f"policy{idx_label}.pt"))
+                torch.save(self.vae.encoder, os.path.join(save_path, f"encoder{idx_label}.pt"))
+                if self.vae.state_decoder is not None:
+                    torch.save(self.vae.state_decoder, os.path.join(save_path, f"state_decoder{idx_label}.pt"))
+                if self.vae.reward_decoder is not None:
+                    torch.save(self.vae.reward_decoder, os.path.join(save_path, f"reward_decoder{idx_label}.pt"))
+                if self.vae.task_decoder is not None:
+                    torch.save(self.vae.task_decoder, os.path.join(save_path, f"task_decoder{idx_label}.pt"))
+
+                # save normalisation params of envs
+                if self.args.norm_rew_for_policy:
+                    rew_rms = self.envs.venv.ret_rms
+                    utl.save_obj(rew_rms, save_path, f"env_rew_rms{idx_label}")
+                # TODO: grab from policy and save?
+                # if self.args.norm_obs_for_policy:
+                #     obs_rms = self.envs.venv.obs_rms
+                #     utl.save_obj(obs_rms, save_path, f"env_obs_rms{idx_label}")
+
+        # --- log some other things ---
+
+        if (self.iter_idx % self.args.log_interval == 0) and (train_stats is not None):
 
             self.logger.add('policy_losses/value_loss', train_stats[0], self.iter_idx)
             self.logger.add('policy_losses/action_loss', train_stats[1], self.iter_idx)

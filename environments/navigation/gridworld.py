@@ -4,10 +4,10 @@ import random
 
 import gym
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 import numpy as np
 import torch
 from gym import spaces
-from matplotlib.patches import Rectangle
 
 from utils import helpers as utl
 
@@ -15,49 +15,27 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class GridNavi(gym.Env):
-    def __init__(self,
-                 num_cells=5, num_steps=15,
-                 oracle=False,  # oracle gets the true goal as input
-                 belief_oracle=False,  # belief oracle gets the true belief as input
-                 give_goal_hint_at_request=False,  # here the policy can *ask* for a hint (might come with a price)
-                 ):
+    def __init__(self, num_cells=5, num_steps=15):
         super(GridNavi, self).__init__()
 
         self.seed()
-
-        self.oracle = oracle
-        self.belief_oracle = belief_oracle
-        assert not (self.oracle and self.belief_oracle)
-
-        self.enable_goal_hint = give_goal_hint_at_request
-
         self.num_cells = num_cells
         self.num_states = num_cells ** 2
 
         self._max_episode_steps = num_steps
         self.step_count = 0
 
-        if self.belief_oracle:
-            self.observation_space = spaces.Box(low=0, high=self.num_cells - 1, shape=(2 + self.num_cells ** 2,),
-                                                dtype=np.float32)
-        elif oracle or self.enable_goal_hint:
-            self.observation_space = spaces.Box(low=0, high=self.num_cells - 1, shape=(2 + 2,), dtype=np.float32)
-        else:
-            self.observation_space = spaces.Box(low=0, high=self.num_cells - 1, shape=(2,), dtype=np.float32)
-
-        if self.enable_goal_hint:
-            self.action_space = spaces.Discrete(6)  # noop, up, right, down, left,  get hint
-        else:
-            self.action_space = spaces.Discrete(5)  # noop, up, right, down, left
+        self.observation_space = spaces.Box(low=0, high=self.num_cells - 1, shape=(2,))
+        self.action_space = spaces.Discrete(5)  # noop, up, right, down, left
+        self.task_dim = 2
+        self.belief_dim = 25
 
         # possible starting states
-        self.starting_states = [(0.0, 0.0)]  # , (self.num_cells-1, 0)]#,
-        # (0, self.num_cells-1), (self.num_cells-1, self.num_cells-1)]
+        self.starting_state = (0.0, 0.0)
 
-        # goals can be anywhere except on possible starting states
+        # goals can be anywhere except on possible starting states and immediately around it
         self.possible_goals = list(itertools.product(range(num_cells), repeat=2))
-        for s in self.starting_states:
-            self.possible_goals.remove(s)
+        self.possible_goals.remove((0, 0))
         self.possible_goals.remove((0, 1))
         self.possible_goals.remove((1, 1))
         self.possible_goals.remove((1, 0))
@@ -66,23 +44,18 @@ class GridNavi(gym.Env):
         self.num_tasks = self.num_states
 
         # reset the environment state
-        self._env_state = np.array(random.choice(self.starting_states))
+        self._env_state = np.array(self.starting_state)
         # reset the goal
         self._goal = self.reset_task()
         # reset the belief
-        if self.belief_oracle:
-            self._belief_state = self._reset_belief()
-
-    def get_task(self):
-        return self._goal
+        self._belief_state = self._reset_belief()
 
     def reset_task(self, task=None):
         if task is None:
             self._goal = np.array(random.choice(self.possible_goals))
         else:
             self._goal = np.array(task)
-        if self.belief_oracle:
-            self._reset_belief()
+        self._reset_belief()
         return self._goal
 
     def _reset_belief(self):
@@ -111,24 +84,16 @@ class GridNavi(gym.Env):
 
         return self._belief_state
 
+    def get_task(self):
+        return self._goal.copy()
+
+    def get_belief(self):
+        return self._belief_state.copy()
+
     def reset(self):
-
         self.step_count = 0
-
-        # reset agent to starting position
-        self._env_state = np.array(random.choice(self.starting_states))
-
-        # get initial observation, augmented with hint/belief
-        if self.oracle:
-            state = np.concatenate((self._env_state.copy(), self._goal.copy()))
-        elif self.belief_oracle:
-            state = np.concatenate((self._env_state.copy(), self._belief_state.copy()))
-        elif self.enable_goal_hint:
-            state = np.concatenate((self._env_state, np.zeros(2)))
-        else:
-            state = self._env_state.copy()
-
-        return state
+        self._env_state = np.array(self.starting_state)
+        return self._env_state.copy()
 
     def state_transition(self, action):
         """
@@ -165,23 +130,18 @@ class GridNavi(gym.Env):
         # compute reward
         if self._env_state[0] == self._goal[0] and self._env_state[1] == self._goal[1]:
             reward = 1.0
-        elif self.enable_goal_hint and action == 5:
-            reward = -1
         else:
             reward = -0.1
 
-        # give hint / belief
-        if self.belief_oracle:
-            self.update_belief(self._env_state, action)
-            state = np.concatenate((self._env_state.copy(), self._belief_state.copy()))
-        elif self.oracle or self.enable_goal_hint:
-            state = np.concatenate((state.copy(), np.zeros(2)))
-            if self.oracle:
-                state[-2:] = self._goal.copy()
-            elif action == 5 and self.enable_goal_hint:
-                state[-2:] = self._goal.copy()
+        # update ground-truth belief
+        self.update_belief(self._env_state, action)
 
-        return state, reward, done, {'task': self.get_task()}
+        task = self.get_task()
+        task_id = self.task_to_id(task)
+        info = {'task': task,
+                'task_id': task_id,
+                'belief': self.get_belief()}
+        return state, reward, done, info
 
     def task_to_id(self, goals):
         mat = torch.arange(0, self.num_cells ** 2).long().reshape((self.num_cells, self.num_cells))
@@ -263,7 +223,7 @@ class GridNavi(gym.Env):
         episode_lengths = []
 
         episode_goals = []
-        if getattr(unwrapped_env, 'belief_oracle', False):
+        if args.pass_belief_to_policy and (encoder is None):
             episode_beliefs = [[] for _ in range(num_episodes)]
         else:
             episode_beliefs = None
@@ -281,10 +241,8 @@ class GridNavi(gym.Env):
         # --- roll out policy ---
 
         env.reset_task()
-        (obs_raw, obs_normalised) = env.reset()
-        obs_raw = obs_raw.float().reshape((1, -1)).to(device)
-        obs_normalised = obs_normalised.float().reshape((1, -1)).to(device)
-        start_obs_raw = obs_raw.clone()
+        [state, belief, task] = utl.reset_env(env, args)
+        start_obs = state.clone()
 
         for episode_idx in range(args.max_rollouts_per_task):
 
@@ -305,35 +263,37 @@ class GridNavi(gym.Env):
                 episode_latent_means[episode_idx].append(curr_latent_mean[0].clone())
                 episode_latent_logvars[episode_idx].append(curr_latent_logvar[0].clone())
 
-            episode_all_obs[episode_idx].append(start_obs_raw.clone())
-            if getattr(unwrapped_env, 'belief_oracle', False):
-                episode_beliefs[episode_idx].append(unwrapped_env.unwrapped._belief_state.copy())
+            episode_all_obs[episode_idx].append(start_obs.clone())
+            if args.pass_belief_to_policy and (encoder is None):
+                episode_beliefs[episode_idx].append(belief)
 
             for step_idx in range(1, env._max_episode_steps + 1):
 
                 if step_idx == 1:
-                    episode_prev_obs[episode_idx].append(start_obs_raw.clone())
+                    episode_prev_obs[episode_idx].append(start_obs.clone())
                 else:
-                    episode_prev_obs[episode_idx].append(obs_raw.clone())
+                    episode_prev_obs[episode_idx].append(state.clone())
 
                 # act
                 _, action, _ = utl.select_action(args=args,
                                                  policy=policy,
-                                                 obs=obs_normalised if args.norm_obs_for_policy else obs_raw,
+                                                 state=state.view(-1),
+                                                 belief=belief,
+                                                 task=task,
                                                  deterministic=True,
-                                                 latent_sample=curr_latent_sample, latent_mean=curr_latent_mean,
-                                                 latent_logvar=curr_latent_logvar)
+                                                 latent_sample=curr_latent_sample.view(-1) if (curr_latent_sample is not None) else None,
+                                                 latent_mean=curr_latent_mean.view(-1) if (curr_latent_mean is not None) else None,
+                                                 latent_logvar=curr_latent_logvar.view(-1) if (curr_latent_logvar is not None) else None,
+                                                 )
 
                 # observe reward and next obs
-                (obs_raw, obs_normalised), (rew_raw, rew_normalised), done, infos = utl.env_step(env, action)
-                obs_raw = obs_raw.reshape((1, -1)).to(device)
-                obs_normalised = obs_normalised.reshape((1, -1)).to(device)
+                [state, belief, task], (rew_raw, rew_normalised), done, infos = utl.env_step(env, action, args)
 
                 if encoder is not None:
                     # update task embedding
                     curr_latent_sample, curr_latent_mean, curr_latent_logvar, hidden_state = encoder(
                         action.float().to(device),
-                        obs_raw,
+                        state,
                         rew_raw.reshape((1, 1)).float().to(device),
                         hidden_state,
                         return_prior=False)
@@ -342,20 +302,20 @@ class GridNavi(gym.Env):
                     episode_latent_means[episode_idx].append(curr_latent_mean[0].clone())
                     episode_latent_logvars[episode_idx].append(curr_latent_logvar[0].clone())
 
-                episode_all_obs[episode_idx].append(obs_raw.clone())
-                episode_next_obs[episode_idx].append(obs_raw.clone())
+                episode_all_obs[episode_idx].append(state.clone())
+                episode_next_obs[episode_idx].append(state.clone())
                 episode_rewards[episode_idx].append(rew_raw.clone())
                 episode_actions[episode_idx].append(action.clone())
 
                 curr_rollout_rew.append(rew_raw.clone())
                 curr_rollout_goal.append(env.get_task().copy())
 
-                if getattr(unwrapped_env, 'belief_oracle', False):
-                    episode_beliefs[episode_idx].append(unwrapped_env.unwrapped._belief_state.copy())
+                if args.pass_belief_to_policy and (encoder is None):
+                    episode_beliefs[episode_idx].append(belief)
 
                 if infos[0]['done_mdp'] and not done:
-                    start_obs_raw = infos[0]['start_state']
-                    start_obs_raw = torch.from_numpy(start_obs_raw).float().reshape((1, -1)).to(device)
+                    start_obs = infos[0]['start_state']
+                    start_obs = torch.from_numpy(start_obs).float().reshape((1, -1)).to(device)
                     break
 
             episode_returns.append(sum(curr_rollout_rew))
@@ -481,10 +441,10 @@ def plot_bb(env, args, episode_all_obs, episode_goals, reward_decoder,
                                          curr_goal)
                 rew_pred_means[episode_idx].append(rm)
                 rew_pred_vars[episode_idx].append(rv)
-                plot_belief(env, rm)
+                plot_belief(env, rm, args)
             elif episode_beliefs is not None:
-                curr_beliefs = torch.tensor(episode_beliefs[episode_idx][step_idx])
-                plot_belief(env, curr_beliefs)
+                curr_beliefs = episode_beliefs[episode_idx][step_idx]
+                plot_belief(env, curr_beliefs, args)
             else:
                 rew_pred_means = rew_pred_vars = None
 
@@ -551,8 +511,13 @@ def compute_beliefs(env, args, reward_decoder, latent_mean, latent_logvar, goal)
 
     # compute reward predictions for those
     if reward_decoder.multi_head:
-        rew_pred_means = torch.mean(reward_decoder(samples, None), dim=0)  # .reshape((1, -1))
-        rew_pred_vars = torch.var(reward_decoder(samples, None), dim=0)  # .reshape((1, -1))
+        rew_pred = reward_decoder(samples, None)
+        if args.rew_pred_type == 'bernoulli':
+            rew_pred = torch.sigmoid(rew_pred)
+        elif args.rew_pred_type == 'categorical':
+            rew_pred = torch.softmax(rew_pred, 1)
+        rew_pred_means = torch.mean(rew_pred, dim=0)  # .reshape((1, -1))
+        rew_pred_vars = torch.var(rew_pred, dim=0)  # .reshape((1, -1))
     else:
         tsm = []
         tsv = []
@@ -563,8 +528,11 @@ def compute_beliefs(env, args, reward_decoder, latent_mean, latent_logvar, goal)
                 if isinstance(goal, np.ndarray):
                     goal = torch.from_numpy(goal)
                 curr_state = torch.cat((curr_state, goal.repeat(curr_state.shape[0], 1).float()), dim=1)
-            tsm.append(torch.mean(reward_decoder(samples, curr_state)))
-            tsv.append(torch.var(reward_decoder(samples, curr_state)))
+            rew_pred = reward_decoder(samples, curr_state)
+            if args.rew_pred_type == 'bernoulli':
+                rew_pred = torch.sigmoid(rew_pred)
+            tsm.append(torch.mean(rew_pred))
+            tsv.append(torch.var(rew_pred))
         rew_pred_means = torch.stack(tsm).reshape((1, -1))
         rew_pred_vars = torch.stack(tsv).reshape((1, -1))
     # rew_pred_means = rew_pred_means[-1][0]
@@ -572,16 +540,13 @@ def compute_beliefs(env, args, reward_decoder, latent_mean, latent_logvar, goal)
     return rew_pred_means, rew_pred_vars
 
 
-def plot_belief(env, beliefs):
+def plot_belief(env, beliefs, args):
     """
     Plot the belief by taking 100 samples from the latent space and plotting the average predicted reward per cell.
     """
 
     num_cells = int(env.observation_space.high[0] + 1)
     unwrapped_env = env.venv.unwrapped.envs[0]
-
-    if not hasattr(unwrapped_env, 'task_to_id'):
-        return
 
     # draw probabilities for each grid cell
     alphas = []
@@ -593,6 +558,9 @@ def plot_belief(env, beliefs):
             alpha = beliefs[idx]
             alphas.append(alpha.item())
     alphas = np.array(alphas)
+    # cut off values (this only happens if we don't use sigmoid/softmax)
+    alphas[alphas < 0] = 0
+    alphas[alphas > 1] = 1
     # alphas = (np.array(alphas)-min(alphas)) / (max(alphas) - min(alphas))
     count = 0
     for i in range(num_cells):

@@ -51,7 +51,7 @@ class HalfCheetahVelEnv(HalfCheetahEnv):
         self.goal_velocity = task
 
     def get_task(self):
-        return self.goal_velocity
+        return np.array([self.goal_velocity])
 
     def sample_tasks(self, n_tasks):
         return [random.uniform(0.0, 3.0) for _ in range(n_tasks)]

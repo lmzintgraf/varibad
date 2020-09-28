@@ -3,9 +3,9 @@ import random
 import numpy as np
 import torch
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
 from environments.mujoco.half_cheetah import HalfCheetahEnv
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class HalfCheetahDirEnv(HalfCheetahEnv):
@@ -58,21 +58,9 @@ class HalfCheetahDirEnv(HalfCheetahEnv):
         self.goal_direction = task
 
     def get_task(self):
-        return self.goal_direction
+        return np.array([self.goal_direction])
 
     def reset_task(self, task=None):
         if task is None:
             task = self.sample_tasks(1)[0]
         self.set_task(task)
-        # self.reset()
-
-
-class HalfCheetahDirOracleEnv(HalfCheetahDirEnv):
-
-    def _get_obs(self):
-        return np.concatenate([
-            self.sim.data.qpos.flat[1:],
-            self.sim.data.qvel.flat,
-            self.get_body_com("torso").flat,
-            [self.goal_direction]
-        ]).astype(np.float32).flatten()

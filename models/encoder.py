@@ -1,3 +1,5 @@
+import numpy as np
+
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -21,18 +23,12 @@ class RNNEncoder(nn.Module):
                  state_embed_dim=10,
                  reward_size=1,
                  reward_embed_size=5,
-                 #
-                 distribution='gaussian',
                  ):
         super(RNNEncoder, self).__init__()
 
         self.latent_dim = latent_dim
         self.hidden_size = hidden_size
-
-        if distribution == 'gaussian':
-            self.reparameterise = self._sample_gaussian
-        else:
-            raise NotImplementedError
+        self.reparameterise = self._sample_gaussian
 
         # embed action, state, reward
         self.state_encoder = utl.FeatureExtractor(state_dim, state_embed_dim, F.relu)
@@ -47,6 +43,7 @@ class RNNEncoder(nn.Module):
             curr_input_dim = layers_before_gru[i]
 
         # recurrent unit
+        # TODO: TEST RNN vs GRU vs LSTM
         self.gru = nn.GRU(input_size=curr_input_dim,
                           hidden_size=hidden_size,
                           num_layers=1,
@@ -81,13 +78,14 @@ class RNNEncoder(nn.Module):
             mu = mu.repeat(num, 1)
             return eps.mul(std).add_(mu)
 
-    def reset_hidden(self, hidden_state, reset_task):
-        if hidden_state.dim() != reset_task.dim():
-            if reset_task.dim() == 2:
-                reset_task = reset_task.unsqueeze(0)
-            elif reset_task.dim() == 1:
-                reset_task = reset_task.unsqueeze(0).unsqueeze(2)
-        hidden_state = hidden_state * (1 - reset_task)
+    def reset_hidden(self, hidden_state, done):
+        """ Reset the hidden state where the BAMDP was done (i.e., we get a new task) """
+        if hidden_state.dim() != done.dim():
+            if done.dim() == 2:
+                done = done.unsqueeze(0)
+            elif done.dim() == 1:
+                done = done.unsqueeze(0).unsqueeze(2)
+        hidden_state = hidden_state * (1 - done)
         return hidden_state
 
     def prior(self, batch_size, sample=True):
@@ -112,7 +110,7 @@ class RNNEncoder(nn.Module):
 
         return latent_sample, latent_mean, latent_logvar, hidden_state
 
-    def forward(self, actions, states, rewards, hidden_state, return_prior, sample=True):
+    def forward(self, actions, states, rewards, hidden_state, return_prior, sample=True, detach_every=None):
         """
         Actions, states, rewards should be given in form [sequence_len * batch_size * dim].
         For one-step predictions, sequence_len=1 and hidden_state!=None.
@@ -143,9 +141,18 @@ class RNNEncoder(nn.Module):
         for i in range(len(self.fc_before_gru)):
             h = F.relu(self.fc_before_gru[i](h))
 
-        # GRU cell (output is outputs for each time step, hidden_state is last output)
-        output, _ = self.gru(h, hidden_state)
-        # gru_h = F.relu(output)  # TODO: should this be here?
+        if detach_every is None:
+            # GRU cell (output is outputs for each time step, hidden_state is last output)
+            output, _ = self.gru(h, hidden_state)
+        else:
+            output = []
+            for i in range(int(np.ceil(h.shape[0] / detach_every))):
+                curr_input = h[i*detach_every:i*detach_every+detach_every]  # pytorch caps if we overflow, nice
+                curr_output, hidden_state = self.gru(curr_input, hidden_state)
+                output.append(curr_output)
+                # detach hidden state; useful for BPTT when sequences are very long
+                hidden_state = hidden_state.detach()
+            output = torch.cat(output, dim=0)
         gru_h = output.clone()
 
         # forward through fully connected layers after GRU

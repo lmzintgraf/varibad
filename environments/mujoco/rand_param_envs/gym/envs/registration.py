@@ -123,11 +123,11 @@ class EnvRegistry(object):
         self.env_specs = {}
 
     def make(self, id):
-        logger.info('Making new env: %s', id)
+        # logger.info('Making new env: %s', id)
         spec = self.spec(id)
         env = spec.make()
         if (env.spec.timestep_limit is not None) and not spec.tags.get('vnc'):
-            from rand_param_envs.gym.wrappers.time_limit import TimeLimit
+            from environments.mujoco.rand_param_envs.gym.wrappers.time_limit import TimeLimit
             env = TimeLimit(env,
                             max_episode_steps=env.spec.max_episode_steps,
                             max_episode_seconds=env.spec.max_episode_seconds)

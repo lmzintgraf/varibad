@@ -1,17 +1,68 @@
 import os
+import gym
 import pickle
 import random
 import warnings
+from distutils.util import strtobool
 
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.nn import functional as F
+
+from environments.parallel_envs import make_vec_envs
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-def env_step(envs, action):
-    next_obs, reward, done, infos = envs.step(action.detach())
+# def save_models(args, logger, policy, vae, envs, iter_idx):
+#     # TODO: save parameters, not entire model
+#
+#     save_path = os.path.join(logger.full_output_folder, 'models')
+#     if not os.path.exists(save_path):
+#         os.mkdir(save_path)
+#     try:
+#         torch.save(policy.actor_critic, os.path.join(save_path, "policy{0}.pt".format(iter_idx)))
+#     except AttributeError:
+#         torch.save(policy.policy, os.path.join(save_path, "policy{0}.pt".format(iter_idx)))
+#     torch.save(vae.encoder, os.path.join(save_path, "encoder{0}.pt".format(iter_idx)))
+#     if vae.state_decoder is not None:
+#         torch.save(vae.state_decoder, os.path.join(save_path, "state_decoder{0}.pt".format(iter_idx)))
+#     if vae.reward_decoder is not None:
+#         torch.save(vae.reward_decoder,
+#                    os.path.join(save_path, "reward_decoder{0}.pt".format(iter_idx)))
+#     if vae.task_decoder is not None:
+#         torch.save(vae.task_decoder, os.path.join(save_path, "task_decoder{0}.pt".format(iter_idx)))
+#
+#     # save normalisation params of envs
+#     if args.norm_rew_for_policy:
+#         rew_rms = envs.venv.ret_rms
+#         save_obj(rew_rms, save_path, "env_rew_rms{0}.pkl".format(iter_idx))
+#     if args.norm_obs_for_policy:
+#         obs_rms = envs.venv.obs_rms
+#         save_obj(obs_rms, save_path, "env_obs_rms{0}.pkl".format(iter_idx))
+
+
+def reset_env(env, args, indices=None, state=None):
+    """ env can be many environments or just one """
+    # reset all environments
+    if (indices is None) or (len(indices) == args.num_processes):
+        state = env.reset().to(device)
+    # reset only the ones given by indices
+    else:
+        assert state is not None
+        for i in indices:
+            state[i] = env.reset(index=i)
+
+    belief = torch.from_numpy(env.get_belief()).to(device) if args.pass_belief_to_policy else None
+    task = torch.from_numpy(env.get_task()).to(device) if args.pass_task_to_policy else None
+        
+    return state, belief, task
+
+
+def env_step(env, action, args):
+
+    next_obs, reward, done, infos = env.step(action.detach())
 
     if isinstance(next_obs, list):
         next_obs = [o.to(device) for o in next_obs]
@@ -22,21 +73,22 @@ def env_step(envs, action):
     else:
         reward = reward.to(device)
 
-    return next_obs, reward, done, infos
+    belief = torch.from_numpy(env.get_belief()).to(device) if args.pass_belief_to_policy else None
+    task = torch.from_numpy(env.get_task()).to(device) if args.pass_task_to_policy else None
+
+    return [next_obs, belief, task], reward, done, infos
 
 
 def select_action(args,
                   policy,
-                  obs,
                   deterministic,
+                  state=None,
+                  belief=None,
+                  task=None,
                   latent_sample=None, latent_mean=None, latent_logvar=None):
-    """
-    Select action using the policy.
-    """
-
-    # augment the observation with the latent distribution
-    obs = get_augmented_obs(args, obs, latent_sample, latent_mean, latent_logvar)
-    action = policy.act(obs, deterministic)
+    """ Select action using the policy. """
+    latent = get_latent_for_policy(args=args, latent_sample=latent_sample, latent_mean=latent_mean, latent_logvar=latent_logvar)
+    action = policy.act(state=state, latent=latent, belief=belief, task=task, deterministic=deterministic)
     if isinstance(action, list) or isinstance(action, tuple):
         value, action, action_log_prob = action
     else:
@@ -46,26 +98,25 @@ def select_action(args,
     return value, action, action_log_prob
 
 
-def get_augmented_obs(args, obs,
-                      latent_sample=None, latent_mean=None, latent_logvar=None):
-    obs_augmented = obs.clone()
+def get_latent_for_policy(args, latent_sample=None, latent_mean=None, latent_logvar=None):
 
-    if latent_sample is None:
-        sample_embeddings = False
+    if (latent_sample is None) and (latent_mean is None) and (latent_logvar is None):
+        return None
+
+    if args.add_nonlinearity_to_latent:
+        latent_sample = F.relu(latent_sample)
+        latent_mean = F.relu(latent_mean)
+        latent_logvar = F.relu(latent_logvar)
+
+    if args.sample_embeddings:
+        latent = latent_sample
     else:
-        sample_embeddings = args.sample_embeddings
+        latent = torch.cat((latent_mean, latent_logvar), dim=-1)
 
-    if not args.condition_policy_on_state:
-        obs_augmented = torch.zeros(0, ).to(device)
+    if latent.shape[0] == 1:
+        latent = latent.squeeze(0)
 
-    if sample_embeddings and (latent_sample is not None):
-        obs_augmented = torch.cat((obs_augmented, latent_sample), dim=1)
-    elif (latent_mean is not None) and (latent_logvar is not None):
-        latent_mean = latent_mean.reshape((-1, latent_mean.shape[-1]))
-        latent_logvar = latent_logvar.reshape((-1, latent_logvar.shape[-1]))
-        obs_augmented = torch.cat((obs_augmented, latent_mean, latent_logvar), dim=1)
-
-    return obs_augmented
+    return latent
 
 
 def update_encoding(encoder, next_obs, action, reward, done, hidden_state):
@@ -79,6 +130,8 @@ def update_encoding(encoder, next_obs, action, reward, done, hidden_state):
                                                                           rewards=reward,
                                                                           hidden_state=hidden_state,
                                                                           return_prior=False)
+
+    # TODO: move the sampling out of the encoder!
 
     return latent_sample, latent_mean, latent_logvar, hidden_state
 
@@ -95,8 +148,8 @@ def seed(seed, deterministic_execution=False):
         torch.backends.cudnn.benchmark = False
     else:
         print('Note that due to parallel processing results will be similar but not identical. '
-              'Use only one process and set --deterministic_execution to True if you want identical results. '
-              '(Not recommended; will slow code down and might not be possible with A2C) ')
+              'Use only one process and set --deterministic_execution to True if you want identical results '
+              '(only recommended for debugging).')
 
 
 def update_linear_schedule(optimizer, epoch, total_num_epochs, initial_lr):
@@ -111,6 +164,7 @@ def recompute_embeddings(
         encoder,
         sample,
         update_idx,
+        detach_every
 ):
     # get the prior
     latent_sample = [policy_storage.latent_samples[0].detach().clone()]
@@ -126,15 +180,15 @@ def recompute_embeddings(
     h = policy_storage.hidden_states[0].detach()
     for i in range(policy_storage.actions.shape[0]):
         # reset hidden state of the GRU when we reset the task
-        reset_task = policy_storage.done[i + 1]
-        h = encoder.reset_hidden(h, reset_task)
+        h = encoder.reset_hidden(h, policy_storage.done[i + 1])
 
         ts, tm, tl, h = encoder(policy_storage.actions.float()[i:i + 1],
-                                policy_storage.next_obs_raw[i:i + 1],
+                                policy_storage.next_state[i:i + 1],
                                 policy_storage.rewards_raw[i:i + 1],
                                 h,
                                 sample=sample,
-                                return_prior=False
+                                return_prior=False,
+                                detach_every=detach_every
                                 )
 
         # print(i, reset_task.sum())
@@ -180,15 +234,12 @@ class FeatureExtractor(nn.Module):
 
 
 def sample_gaussian(mu, logvar, num=None):
-    if num is None:
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        return eps.mul(std).add_(mu)
-    else:
-        std = torch.exp(0.5 * logvar).repeat(num, 1)
-        eps = torch.randn_like(std)
+    std = torch.exp(0.5 * logvar)
+    if num is not None:
+        std = std.repeat(num, 1)
         mu = mu.repeat(num, 1)
-        return eps.mul(std).add_(mu)
+    eps = torch.randn_like(std)
+    return mu + std * eps
 
 
 def save_obj(obj, folder, name):
@@ -235,3 +286,44 @@ def update_mean_var_count_from_moments(mean, var, count, batch_mean, batch_var, 
     new_count = tot_count
 
     return new_mean, new_var, new_count
+
+
+def boolean_argument(value):
+    """Convert a string value to boolean."""
+    return bool(strtobool(value))
+
+
+def get_task_dim(args):
+    env = make_vec_envs(env_name=args.env_name, seed=args.seed, num_processes=args.num_processes,
+                        gamma=args.policy_gamma, device=device,
+                        episodes_per_task=args.max_rollouts_per_task,
+                        normalise_rew=args.norm_rew_for_policy, ret_rms=None,
+                        )
+    return env.task_dim
+
+
+def get_num_tasks(args):
+    env = gym.make(args.env_name)
+    try:
+        num_tasks = env.num_tasks
+    except AttributeError:
+        num_tasks = None
+    return num_tasks
+
+
+def clip(value, low, high):
+    """Imitates `{np,tf}.clip`.
+
+    `torch.clamp` doesn't support tensor valued low/high so this provides the
+    clip functionality.
+
+    TODO(hartikainen): The broadcasting hasn't been extensively tested yet,
+        but works for the regular cases where
+        `value.shape == low.shape == high.shape` or when `{low,high}.shape == ()`.
+    """
+    low, high = torch.tensor(low), torch.tensor(high)
+
+    assert torch.all(low <= high), (low, high)
+
+    clipped_value = torch.max(torch.min(value, high), low)
+    return clipped_value

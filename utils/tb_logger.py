@@ -3,7 +3,7 @@ import json
 import os
 
 import torch
-from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -39,7 +39,7 @@ class TBLogger:
             self.full_output_folder = os.path.join(os.path.join(dir_path, 'logs_{}'.format(args["env_name"])),
                                                    self.output_name)
 
-        self.writer = SummaryWriter(self.full_output_folder)
+        self.writer = SummaryWriter(log_dir=self.full_output_folder)
 
         print('logging under', self.full_output_folder)
 
