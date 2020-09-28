@@ -28,7 +28,7 @@ def get_args(rest_args):
 
     # normalising (inputs/rewards/outputs)
     parser.add_argument('--norm_state_for_policy', type=boolean_argument, default=True, help='normalise state input')
-    parser.add_argument('--norm_latent_for_policy', type=boolean_argument, default=True, help='normalise latent input')
+    parser.add_argument('--norm_latent_for_policy', type=boolean_argument, default=False, help='normalise latent input')
     parser.add_argument('--norm_belief_for_policy', type=boolean_argument, default=True, help='normalise belief input')
     parser.add_argument('--norm_task_for_policy', type=boolean_argument, default=True, help='normalise task input')
     parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=True, help='normalise rew for RL train')
@@ -37,8 +37,8 @@ def get_args(rest_args):
     # network
     parser.add_argument('--policy_layers', nargs='+', default=[128, 128])
     parser.add_argument('--policy_activation_function', type=str, default='tanh', help='tanh/relu/leaky-relu')
-    parser.add_argument('--policy_initialisation', type=str, default='normc', help='normc/orthogonal')
-    parser.add_argument('--policy_anneal_lr', type=boolean_argument, default=False, help='anneal LR over time')
+    parser.add_argument('--policy_initialisation', type=str, default='orthogonal', help='normc/orthogonal')
+    parser.add_argument('--policy_anneal_lr', type=boolean_argument, default=True, help='anneal LR over time')
 
     # RL algorithm
     parser.add_argument('--policy', type=str, default='ppo', help='choose: a2c, ppo')
@@ -52,7 +52,7 @@ def get_args(rest_args):
     parser.add_argument('--ppo_clip_param', type=float, default=0.05, help='clamp param')
 
     # other hyperparameters
-    parser.add_argument('--lr_policy', type=float, default=7e-4, help='learning rate (default: 7e-4)')
+    parser.add_argument('--lr_policy', type=float, default=1e-3, help='learning rate (default: 7e-4)')
     parser.add_argument('--num_processes', type=int, default=16,
                         help='how many training CPU processes / parallel environments to use (default: 16)')
     parser.add_argument('--policy_num_steps', type=int, default=200,
@@ -93,7 +93,7 @@ def get_args(rest_args):
                         help='Average reconstruction terms (instead of sum)')
     parser.add_argument('--num_vae_updates', type=int, default=1,
                         help='how many VAE update steps to take per meta-iteration')
-    parser.add_argument('--pretrain_len', type=int, default=5, help='for how many updates to pre-train the VAE')
+    parser.add_argument('--pretrain_len', type=int, default=0, help='for how many updates to pre-train the VAE')
     parser.add_argument('--kl_weight', type=float, default=0.1, help='weight for the KL term')
 
     parser.add_argument('--split_batches_by_task', type=boolean_argument, default=False,
