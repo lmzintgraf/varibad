@@ -89,7 +89,7 @@ def main():
         if torch.backends.cudnn.enabled:
             warnings.warn('Running with deterministic CUDNN.')
         if args.num_processes > 1:
-            raise RuntimeError('If you want fully deterministic code, run it with num_processes=1.'
+            raise RuntimeError('If you want fully deterministic code, use num_processes 1.'
                                'Warning: This will slow things down and might break A2C if '
                                'policy_num_steps < env._max_episode_steps.')
 

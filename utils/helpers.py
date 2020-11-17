@@ -150,7 +150,7 @@ def seed(seed, deterministic_execution=False):
         torch.backends.cudnn.benchmark = False
     else:
         print('Note that due to parallel processing results will be similar but not identical. '
-              'Use only one process and set --deterministic_execution to True if you want identical results '
+              'If you want identical results, use --num_processes 1 and --deterministic_execution True '
               '(only recommended for debugging).')
 
 
