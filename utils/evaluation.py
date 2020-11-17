@@ -87,7 +87,8 @@ def evaluate(args,
                 # count task up, but cap at num_episodes + 1
                 task_count[i] = min(task_count[i] + 1, num_episodes)  # zero-indexed, so no +1
             if np.sum(done) > 0:
-                state, belief, task = utl.reset_env(envs, args, indices=done, state=state)
+                done_indices = np.argwhere(done.flatten()).flatten()
+                state, belief, task = utl.reset_env(envs, args, indices=done_indices, state=state)
 
     envs.close()
 

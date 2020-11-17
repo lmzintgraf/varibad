@@ -46,6 +46,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 def reset_env(env, args, indices=None, state=None):
     """ env can be many environments or just one """
     # reset all environments
+    if indices is not None:
+        assert not isinstance(indices[0], bool)
     if (indices is None) or (len(indices) == args.num_processes):
         state = env.reset().to(device)
     # reset only the ones given by indices
