@@ -160,13 +160,18 @@ class Policy(nn.Module):
                 latent = (latent - self.latent_rms.mean) / torch.sqrt(self.latent_rms.var + 1e-8)
             if self.use_latent_encoder:
                 latent = self.latent_encoder(latent)
+            if len(latent.shape) == 1 and len(state.shape) == 2:
+                latent = latent.unsqueeze(0)
         else:
             latent = torch.zeros(0, ).to(device)
         if self.pass_belief_to_policy:
             if self.norm_belief:
                 belief = (belief - self.belief_rms.mean) / torch.sqrt(self.belief_rms.var + 1e-8)
             if self.use_belief_encoder:
-                belief = self.belief_encoder(belief.float())
+                belief = self.belief_encoder(belief)
+            belief = belief.float()
+            if len(belief.shape) == 1 and len(state.shape) == 2:
+                belief = belief.unsqueeze(0)
         else:
             belief = torch.zeros(0, ).to(device)
         if self.pass_task_to_policy:
@@ -174,6 +179,8 @@ class Policy(nn.Module):
                 task = (task - self.task_rms.mean) / torch.sqrt(self.task_rms.var + 1e-8)
             if self.use_task_encoder:
                 task = self.task_encoder(task.float())
+            if len(task.shape) == 1 and len(state.shape) == 2:
+                task = task.unsqueeze(0)
         else:
             task = torch.zeros(0, ).to(device)
 

@@ -75,7 +75,7 @@ def env_step(env, action, args):
     else:
         reward = reward.to(device)
 
-    belief = torch.from_numpy(env.get_belief()).to(device) if args.pass_belief_to_policy else None
+    belief = torch.from_numpy(env.get_belief()).float().to(device) if args.pass_belief_to_policy else None
     task = torch.from_numpy(env.get_task()).to(device) if args.pass_task_to_policy else None
 
     return [next_obs, belief, task], reward, done, infos
