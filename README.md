@@ -44,10 +44,10 @@ which will use hyperparameters from `config/gridworld/args_grid_varibad.py`.
 
 To run variBAD on the MuJoCo experiments use:
 ```
-python main.py --env-type mujoco_cheetah_dir_varibad
-python main.py --env-type mujoco_cheetah_vel_varibad
-python main.py --env-type mujoco_ant_dir_varibad
-python main.py --env-type mujoco_walker_varibad
+python main.py --env-type cheetah_dir_varibad
+python main.py --env-type cheetah_vel_varibad
+python main.py --env-type ant_dir_varibad
+python main.py --env-type walker_varibad
 ```
 
 You can also run RL2 and the Oracle, just replace `varibad` above with the respective string. 
