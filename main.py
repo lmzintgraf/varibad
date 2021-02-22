@@ -5,6 +5,7 @@ Takes a flag --env-type (see below for choices) and loads the parameters from th
 import argparse
 import warnings
 
+import numpy as np
 import torch
 
 # get configs
@@ -16,13 +17,14 @@ from config.mujoco import \
     args_ant_dir_oracle, args_ant_dir_rl2, args_ant_dir_varibad, \
     args_ant_goal_oracle, args_ant_goal_rl2, args_ant_goal_varibad, \
     args_walker_oracle, args_walker_avg, args_walker_rl2, args_walker_varibad
+from environments.parallel_envs import make_vec_envs
 from learner import Learner
 from metalearner import MetaLearner
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env-type', default='ant_dir_rl2')
+    parser.add_argument('--env-type', default='cheetah_vel_avg')
     args, rest_args = parser.parse_known_args()
     env = args.env_type
 
@@ -93,8 +95,18 @@ def main():
                                'Warning: This will slow things down and might break A2C if '
                                'policy_num_steps < env._max_episode_steps.')
 
+    # if we're normalising the actions, we have to make sure that the env expects actions within [-1, 1]
+    if args.norm_actions_pre_sampling or args.norm_actions_post_sampling:
+        envs = make_vec_envs(env_name=args.env_name, seed=0, num_processes=args.num_processes,
+                             gamma=args.policy_gamma, device='cpu',
+                             episodes_per_task=args.max_rollouts_per_task,
+                             normalise_rew=args.norm_rew_for_policy, ret_rms=None,
+                             )
+        assert np.unique(envs.action_space.low) == [-1]
+        assert np.unique(envs.action_space.high) == [1]
+
     # clean up arguments
-    if hasattr(args, 'disable_decoder') and args.disable_decoder:
+    if args.disable_metalearner or args.disable_decoder:
         args.decode_reward = False
         args.decode_state = False
         args.decode_task = False

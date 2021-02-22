@@ -11,6 +11,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class RNNEncoder(nn.Module):
     def __init__(self,
+                 args,
                  # network size
                  layers_before_gru=(),
                  hidden_size=64,
@@ -26,6 +27,7 @@ class RNNEncoder(nn.Module):
                  ):
         super(RNNEncoder, self).__init__()
 
+        self.args = args
         self.latent_dim = latent_dim
         self.hidden_size = hidden_size
         self.reparameterise = self._sample_gaussian
@@ -117,6 +119,9 @@ class RNNEncoder(nn.Module):
         For feeding in entire trajectories, sequence_len>1 and hidden_state=None.
         In the latter case, we return embeddings of length sequence_len+1 since they include the prior.
         """
+
+        # we do the action-normalisation (the the env bounds) here
+        actions = utl.squash_action(actions, self.args)
 
         # shape should be: sequence_len x batch_size x hidden_size
         actions = actions.reshape((-1, *actions.shape[-2:]))

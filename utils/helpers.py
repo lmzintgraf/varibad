@@ -1,5 +1,4 @@
 import os
-import gym
 import pickle
 import random
 import warnings
@@ -47,7 +46,7 @@ def reset_env(env, args, indices=None, state=None):
     """ env can be many environments or just one """
     # reset all environments
     if (indices is None) or (len(indices) == args.num_processes):
-        state = env.reset().to(device)
+        state = env.reset().float().to(device)
     # reset only the ones given by indices
     else:
         assert state is not None
@@ -60,9 +59,16 @@ def reset_env(env, args, indices=None, state=None):
     return state, belief, task
 
 
-def env_step(env, action, args):
+def squash_action(action, args):
+    if args.norm_actions_post_sampling:
+        return torch.tanh(action)
+    else:
+        return action
 
-    next_obs, reward, done, infos = env.step(action.detach())
+
+def env_step(env, action, args):
+    act = squash_action(action.detach(), args)
+    next_obs, reward, done, infos = env.step(act)
 
     if isinstance(next_obs, list):
         next_obs = [o.to(device) for o in next_obs]
@@ -73,8 +79,8 @@ def env_step(env, action, args):
     else:
         reward = reward.to(device)
 
-    belief = torch.from_numpy(env.get_belief()).to(device) if args.pass_belief_to_policy else None
-    task = torch.from_numpy(env.get_task()).to(device) if args.pass_task_to_policy else None
+    belief = torch.from_numpy(env.get_belief()).float().to(device) if args.pass_belief_to_policy else None
+    task = torch.from_numpy(env.get_task()).to(device) if (args.pass_task_to_policy or args.decode_task) else None
 
     return [next_obs, belief, task], reward, done, infos
 
@@ -87,15 +93,15 @@ def select_action(args,
                   task=None,
                   latent_sample=None, latent_mean=None, latent_logvar=None):
     """ Select action using the policy. """
-    latent = get_latent_for_policy(args=args, latent_sample=latent_sample, latent_mean=latent_mean, latent_logvar=latent_logvar)
+    latent = get_latent_for_policy(args=args, latent_sample=latent_sample, latent_mean=latent_mean,
+                                   latent_logvar=latent_logvar)
     action = policy.act(state=state, latent=latent, belief=belief, task=task, deterministic=deterministic)
     if isinstance(action, list) or isinstance(action, tuple):
-        value, action, action_log_prob = action
+        value, action = action
     else:
         value = None
-        action_log_prob = None
     action = action.to(device)
-    return value, action, action_log_prob
+    return value, action
 
 
 def get_latent_for_policy(args, latent_sample=None, latent_mean=None, latent_logvar=None):
@@ -303,7 +309,11 @@ def get_task_dim(args):
 
 
 def get_num_tasks(args):
-    env = gym.make(args.env_name)
+    env = make_vec_envs(env_name=args.env_name, seed=args.seed, num_processes=args.num_processes,
+                        gamma=args.policy_gamma, device=device,
+                        episodes_per_task=args.max_rollouts_per_task,
+                        normalise_rew=args.norm_rew_for_policy, ret_rms=None,
+                        )
     try:
         num_tasks = env.num_tasks
     except AttributeError:

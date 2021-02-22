@@ -57,7 +57,7 @@ def evaluate(args,
         for step_idx in range(num_steps):
 
             with torch.no_grad():
-                _, action, _ = utl.select_action(args=args,
+                _, action = utl.select_action(args=args,
                                                  policy=policy,
                                                  state=state,
                                                  belief=belief,
@@ -223,7 +223,7 @@ def get_test_rollout(args, env, policy, encoder=None):
                                                latent_sample=curr_latent_sample,
                                                latent_mean=curr_latent_mean,
                                                latent_logvar=curr_latent_logvar)
-            _, action, _ = policy.act(state=state.view(-1), latent=latent, belief=belief, task=task, deterministic=True)
+            _, action = policy.act(state=state.view(-1), latent=latent, belief=belief, task=task, deterministic=True)
             action = action.reshape((1, *action.shape))
 
             # observe reward and next obs

@@ -1,13 +1,14 @@
-import gym
 import warnings
+
+import gym
 import numpy as np
 import torch
 from torch.nn import functional as F
 
 from models.decoder import StateTransitionDecoder, RewardDecoder, TaskDecoder
 from models.encoder import RNNEncoder
-from utils.storage_vae import RolloutStorageVAE
 from utils.helpers import get_task_dim, get_num_tasks
+from utils.storage_vae import RolloutStorageVAE
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -19,13 +20,14 @@ class VaribadVAE:
     - can compute the ELBO loss
     - can update the VAE (encoder+decoder)
     """
+
     def __init__(self, args, logger, get_iter_idx):
 
         self.args = args
         self.logger = logger
         self.get_iter_idx = get_iter_idx
-        self.task_dim = get_task_dim(self.args)
-        self.num_tasks = get_num_tasks(self.args)
+        self.task_dim = get_task_dim(self.args) if self.args.decode_task else None
+        self.num_tasks = get_num_tasks(self.args) if self.args.decode_task else None
 
         # initialise the encoder
         self.encoder = self.initialise_encoder()
@@ -42,7 +44,7 @@ class VaribadVAE:
                                                  state_dim=self.args.state_dim,
                                                  action_dim=self.args.action_dim,
                                                  vae_buffer_add_thresh=self.args.vae_buffer_add_thresh,
-                                                 task_dim=self.task_dim,
+                                                 task_dim=self.task_dim
                                                  )
 
         # initalise optimiser for the encoder and decoders
@@ -59,6 +61,7 @@ class VaribadVAE:
     def initialise_encoder(self):
         """ Initialises and returns an RNN encoder """
         encoder = RNNEncoder(
+            args=self.args,
             layers_before_gru=self.args.encoder_layers_before_gru,
             hidden_size=self.args.encoder_gru_hidden_size,
             layers_after_gru=self.args.encoder_layers_after_gru,
@@ -86,6 +89,7 @@ class VaribadVAE:
         # initialise state decoder for VAE
         if self.args.decode_state:
             state_decoder = StateTransitionDecoder(
+                args=self.args,
                 layers=self.args.state_decoder_layers,
                 latent_dim=latent_dim,
                 action_dim=self.args.action_dim,
@@ -100,6 +104,7 @@ class VaribadVAE:
         # initialise reward decoder for VAE
         if self.args.decode_reward:
             reward_decoder = RewardDecoder(
+                args=self.args,
                 layers=self.args.reward_decoder_layers,
                 latent_dim=latent_dim,
                 state_dim=self.args.state_dim,
@@ -117,6 +122,7 @@ class VaribadVAE:
 
         # initialise task decoder for VAE
         if self.args.decode_task:
+            assert self.task_dim != 0
             task_decoder = TaskDecoder(
                 latent_dim=latent_dim,
                 layers=self.args.task_decoder_layers,
@@ -155,7 +161,6 @@ class VaribadVAE:
         (No reduction of loss along batch dimension is done here; sum/avg has to be done outside) """
 
         if self.args.multihead_for_reward:
-
             rew_pred = self.reward_decoder(latent, None)
             if self.args.rew_pred_type == 'categorical':
                 rew_pred = F.softmax(rew_pred, dim=-1)
@@ -276,8 +281,8 @@ class VaribadVAE:
         # this way we can preserve the structure
         # but we will waste some computation on zero-padded trajectories that are shorter than max_traj_len
         max_traj_len = np.max(trajectory_lens)
-        latent_mean = latent_mean[:max_traj_len+1]
-        latent_logvar = latent_logvar[:max_traj_len+1]
+        latent_mean = latent_mean[:max_traj_len + 1]
+        latent_logvar = latent_logvar[:max_traj_len + 1]
         vae_prev_obs = vae_prev_obs[:max_traj_len]
         vae_next_obs = vae_next_obs[:max_traj_len]
         vae_actions = vae_actions[:max_traj_len]
@@ -397,6 +402,7 @@ class VaribadVAE:
 
         if not self.args.disable_stochasticity_in_latent:
             # compute the KL term for each ELBO term of the current trajectory
+            # shape: [num_elbo_terms] x [num_trajectories]
             kl_loss = self.compute_kl_loss(latent_mean, latent_logvar, elbo_indices)
             # avg/sum the elbos
             if self.args.vae_avg_elbo_terms:
@@ -529,10 +535,8 @@ class VaribadVAE:
 
         return rew_reconstruction_loss, state_reconstruction_loss, task_reconstruction_loss, kl_loss
 
-    def compute_vae_loss(self, update=False):
-        """
-        Returns the VAE loss
-        """
+    def compute_vae_loss(self, update=False, pretrain_index=None):
+        """ Returns the VAE loss """
 
         if not self.rollout_storage.ready_for_update():
             return 0
@@ -596,13 +600,20 @@ class VaribadVAE:
             # nn.utils.clip_grad_norm_(self.encoder.parameters(), self.args.a2c_max_grad_norm)
             # nn.utils.clip_grad_norm_(reward_decoder.parameters(), self.args.max_grad_norm)
 
-        self.log(elbo_loss, rew_reconstruction_loss, state_reconstruction_loss, task_reconstruction_loss, kl_loss)
+        self.log(elbo_loss, rew_reconstruction_loss, state_reconstruction_loss, task_reconstruction_loss, kl_loss,
+                 pretrain_index)
+
 
         return elbo_loss
 
-    def log(self, elbo_loss, rew_reconstruction_loss, state_reconstruction_loss, task_reconstruction_loss, kl_loss):
+    def log(self, elbo_loss, rew_reconstruction_loss, state_reconstruction_loss, task_reconstruction_loss, kl_loss,
+            pretrain_index=None):
 
-        curr_iter_idx = self.get_iter_idx()
+        if pretrain_index is None:
+            curr_iter_idx = self.get_iter_idx()
+        else:
+            curr_iter_idx = - self.args.pretrain_len * self.args.num_vae_updates_per_pretrain + pretrain_index
+
         if curr_iter_idx % self.args.log_interval == 0:
 
             if self.args.decode_reward:

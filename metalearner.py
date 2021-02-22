@@ -30,7 +30,7 @@ class MetaLearner:
         # calculate number of updates and keep count of frames/iterations
         self.num_updates = int(args.num_frames) // args.policy_num_steps // args.num_processes
         self.frames = 0
-        self.iter_idx = 0
+        self.iter_idx = -1
 
         # initialise tensorboard logger
         self.logger = TBLogger(self.args, self.args.exp_label)
@@ -78,12 +78,6 @@ class MetaLearner:
 
     def initialise_policy(self):
 
-        if hasattr(self.envs.action_space, 'low'):
-            action_low = self.envs.action_space.low
-            action_high = self.envs.action_space.high
-        else:
-            action_low = action_high = None
-
         # initialise policy network
         policy_net = Policy(
             args=self.args,
@@ -103,9 +97,6 @@ class MetaLearner:
             #
             action_space=self.envs.action_space,
             init_std=self.args.policy_init_std,
-            norm_actions_of_policy=self.args.norm_actions_of_policy,
-            action_low=action_low,
-            action_high=action_high,
         ).to(device)
 
         # initialise policy trainer
@@ -159,7 +150,6 @@ class MetaLearner:
         with torch.no_grad():
             self.log(None, None, start_time)
 
-        vae_is_pretrained = False
         for self.iter_idx in range(self.num_updates):
 
             # First, re-compute the hidden states given the current rollouts (since the VAE might've changed)
@@ -178,7 +168,7 @@ class MetaLearner:
 
                 # sample actions from policy
                 with torch.no_grad():
-                    value, action, action_log_prob = utl.select_action(
+                    value, action = utl.select_action(
                         args=self.args,
                         policy=self.policy,
                         state=prev_state,
@@ -201,12 +191,13 @@ class MetaLearner:
 
                 with torch.no_grad():
                     # compute next embedding (for next loop and/or value prediction bootstrap)
-                    latent_sample, latent_mean, latent_logvar, hidden_state = utl.update_encoding(encoder=self.vae.encoder,
-                                                                                                  next_obs=next_state,
-                                                                                                  action=action,
-                                                                                                  reward=rew_raw,
-                                                                                                  done=done,
-                                                                                                  hidden_state=hidden_state)
+                    latent_sample, latent_mean, latent_logvar, hidden_state = utl.update_encoding(
+                        encoder=self.vae.encoder,
+                        next_obs=next_state,
+                        action=action,
+                        reward=rew_raw,
+                        done=done,
+                        hidden_state=hidden_state)
 
                 # before resetting, update the embedding and add to vae buffer
                 # (last state might include useful task info)
@@ -218,10 +209,8 @@ class MetaLearner:
                                                     done.clone(),
                                                     task.clone() if task is not None else None)
 
-                if self.args.rlloss_through_encoder:
-                    # add the obs before reset to the policy storage
-                    # (only used to recompute embeddings if rlloss is backpropagated through encoder)
-                    self.policy_storage.next_state[step] = next_state.clone()
+                # add the obs before reset to the policy storage
+                self.policy_storage.next_state[step] = next_state.clone()
 
                 # reset environments that are done
                 done_indices = np.argwhere(done.cpu().flatten()).flatten()
@@ -239,7 +228,6 @@ class MetaLearner:
                     belief=belief,
                     task=task,
                     actions=action,
-                    action_log_probs=action_log_prob,
                     rewards_raw=rew_raw,
                     rewards_normalised=rew_normalised,
                     value_preds=value,
@@ -261,11 +249,10 @@ class MetaLearner:
             if self.args.precollect_len <= self.frames:
 
                 # check if we are pre-training the VAE
-                if self.args.pretrain_len > 0 and not vae_is_pretrained:
-                    for _ in range(self.args.pretrain_len):
-                        self.vae.compute_vae_loss(update=True)
-                    vae_is_pretrained = True
-
+                if self.args.pretrain_len > self.iter_idx:
+                    for p in range(self.args.num_vae_updates_per_pretrain):
+                        self.vae.compute_vae_loss(update=True,
+                                                  pretrain_index=self.iter_idx * self.args.num_vae_updates_per_pretrain + p)
                 # otherwise do the normal update (policy + vae)
                 else:
 
@@ -277,12 +264,14 @@ class MetaLearner:
                                               latent_logvar=latent_logvar)
 
                     # log
-                    run_stats = [action, action_log_prob, value]
+                    run_stats = [action, self.policy_storage.action_log_probs, value]
                     with torch.no_grad():
                         self.log(run_stats, train_stats, start_time)
 
             # clean up after update
             self.policy_storage.after_update()
+
+        self.envs.close()
 
     def encode_running_trajectory(self):
         """
@@ -319,26 +308,35 @@ class MetaLearner:
         Here the policy is updated for good average performance across tasks.
         :return:
         """
-        # bootstrap next value prediction
-        with torch.no_grad():
-            next_value = self.get_value(state=state,
-                                        belief=belief,
-                                        task=task,
-                                        latent_sample=latent_sample,
-                                        latent_mean=latent_mean,
-                                        latent_logvar=latent_logvar)
+        # update policy (if we are not pre-training, have enough data in the vae buffer, and are not at iteration 0)
+        if self.iter_idx >= self.args.pretrain_len and self.iter_idx > 0:
 
-        # compute returns for current rollouts
-        self.policy_storage.compute_returns(next_value, self.args.policy_use_gae, self.args.policy_gamma,
-                                            self.args.policy_tau,
-                                            use_proper_time_limits=self.args.use_proper_time_limits)
+            # bootstrap next value prediction
+            with torch.no_grad():
+                next_value = self.get_value(state=state,
+                                            belief=belief,
+                                            task=task,
+                                            latent_sample=latent_sample,
+                                            latent_mean=latent_mean,
+                                            latent_logvar=latent_logvar)
 
-        # update agent (this will also call the VAE update!)
-        policy_train_stats = self.policy.update(
-            policy_storage=self.policy_storage,
-            encoder=self.vae.encoder,
-            rlloss_through_encoder=self.args.rlloss_through_encoder,
-            compute_vae_loss=self.vae.compute_vae_loss)
+            # compute returns for current rollouts
+            self.policy_storage.compute_returns(next_value, self.args.policy_use_gae, self.args.policy_gamma,
+                                                self.args.policy_tau,
+                                                use_proper_time_limits=self.args.use_proper_time_limits)
+
+            # update agent (this will also call the VAE update!)
+            policy_train_stats = self.policy.update(
+                policy_storage=self.policy_storage,
+                encoder=self.vae.encoder,
+                rlloss_through_encoder=self.args.rlloss_through_encoder,
+                compute_vae_loss=self.vae.compute_vae_loss)
+        else:
+            policy_train_stats = 0, 0, 0, 0
+
+            # pre-train the VAE
+            if self.iter_idx < self.args.pretrain_len:
+                self.vae.compute_vae_loss(update=True)
 
         return policy_train_stats
 
@@ -346,8 +344,7 @@ class MetaLearner:
 
         # --- visualise behaviour of policy ---
 
-        if self.iter_idx % self.args.vis_interval == 0:
-
+        if (self.iter_idx + 1) % self.args.vis_interval == 0:
             ret_rms = self.envs.venv.ret_rms if self.args.norm_rew_for_policy else None
             utl_eval.visualise_behaviour(args=self.args,
                                          policy=self.policy,
@@ -366,7 +363,7 @@ class MetaLearner:
 
         # --- evaluate policy ----
 
-        if self.iter_idx % self.args.eval_interval == 0:
+        if (self.iter_idx + 1) % self.args.eval_interval == 0:
 
             ret_rms = self.envs.venv.ret_rms if self.args.norm_rew_for_policy else None
             returns_per_episode = utl_eval.evaluate(args=self.args,
@@ -393,7 +390,7 @@ class MetaLearner:
 
         # --- save models ---
 
-        if self.iter_idx % self.args.save_interval == 0:
+        if (self.iter_idx + 1) % self.args.save_interval == 0:
             save_path = os.path.join(self.logger.full_output_folder, 'models')
             if not os.path.exists(save_path):
                 os.mkdir(save_path)
@@ -424,7 +421,13 @@ class MetaLearner:
 
         # --- log some other things ---
 
-        if (self.iter_idx % self.args.log_interval == 0) and (train_stats is not None):
+        if ((self.iter_idx + 1) % self.args.log_interval == 0) and (train_stats is not None):
+
+            self.logger.add('environment/state_max', self.policy_storage.prev_state.max(), self.iter_idx)
+            self.logger.add('environment/state_min', self.policy_storage.prev_state.min(), self.iter_idx)
+
+            self.logger.add('environment/rew_max', self.policy_storage.rewards_raw.max(), self.iter_idx)
+            self.logger.add('environment/rew_min', self.policy_storage.rewards_raw.min(), self.iter_idx)
 
             self.logger.add('policy_losses/value_loss', train_stats[0], self.iter_idx)
             self.logger.add('policy_losses/action_loss', train_stats[1], self.iter_idx)

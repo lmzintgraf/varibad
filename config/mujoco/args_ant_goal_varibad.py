@@ -32,7 +32,8 @@ def get_args(rest_args):
     parser.add_argument('--norm_belief_for_policy', type=boolean_argument, default=True, help='normalise belief input')
     parser.add_argument('--norm_task_for_policy', type=boolean_argument, default=True, help='normalise task input')
     parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=True, help='normalise rew for RL train')
-    parser.add_argument('--norm_actions_of_policy', type=boolean_argument, default=False, help='normalise policy output')
+    parser.add_argument('--norm_actions_pre_sampling', type=boolean_argument, default=False, help='normalise policy output')
+    parser.add_argument('--norm_actions_post_sampling', type=boolean_argument, default=False, help='normalise policy output')
 
     # network
     parser.add_argument('--policy_layers', nargs='+', default=[128, 128])
@@ -81,17 +82,17 @@ def get_args(rest_args):
                         help='probability of adding a new trajectory to buffer')
     parser.add_argument('--vae_batch_num_trajs', type=int, default=10,
                         help='how many trajectories to use for VAE update')
-    parser.add_argument('--tbptt_stepsize', type=int, default=50,
+    parser.add_argument('--tbptt_stepsize', type=int, default=None,
                         help='stepsize for truncated backpropagation through time; None uses max (horizon of BAMDP)')
-    parser.add_argument('--vae_subsample_elbos', type=int, default=50,
+    parser.add_argument('--vae_subsample_elbos', type=int, default=None,
                         help='for how many timesteps to compute the ELBO; None uses all')
-    parser.add_argument('--vae_subsample_decodes', type=int, default=50,
+    parser.add_argument('--vae_subsample_decodes', type=int, default=None,
                         help='number of reconstruction terms to subsample; None uses all')
     parser.add_argument('--vae_avg_elbo_terms', type=boolean_argument, default=False,
                         help='Average ELBO terms (instead of sum)')
     parser.add_argument('--vae_avg_reconstruction_terms', type=boolean_argument, default=False,
                         help='Average reconstruction terms (instead of sum)')
-    parser.add_argument('--num_vae_updates', type=int, default=1,
+    parser.add_argument('--num_vae_updates', type=int, default=10,
                         help='how many VAE update steps to take per meta-iteration')
     parser.add_argument('--pretrain_len', type=int, default=0, help='for how many updates to pre-train the VAE')
     parser.add_argument('--kl_weight', type=float, default=0.1, help='weight for the KL term')

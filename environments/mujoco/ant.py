@@ -146,7 +146,7 @@ class AntEnv(MujocoEnv):
                                                    latent_sample=curr_latent_sample,
                                                    latent_mean=curr_latent_mean,
                                                    latent_logvar=curr_latent_logvar)
-                _, action, _ = policy.act(state=state.view(-1), latent=latent, belief=belief, task=task,
+                _, action = policy.act(state=state.view(-1), latent=latent, belief=belief, task=task,
                                           deterministic=True)
 
                 (state, belief, task), (rew, rew_normalised), done, info = utl.env_step(env, action, args)

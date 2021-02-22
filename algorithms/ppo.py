@@ -76,6 +76,10 @@ class PPO:
         # update the normalisation parameters of policy inputs before updating
         self.actor_critic.update_rms(args=self.args, policy_storage=policy_storage)
 
+        # call this to make sure that the action_log_probs are computed
+        # (needs to be done right here because of some caching thing when normalising actions)
+        policy_storage.before_update(self.actor_critic)
+
         value_loss_epoch = 0
         action_loss_epoch = 0
         dist_entropy_epoch = 0
@@ -102,11 +106,10 @@ class PPO:
                                                          )
 
                 # Reshape to do in a single forward pass for all steps
-                values, action_log_probs, dist_entropy, action_mean, action_logstd = \
+                values, action_log_probs, dist_entropy = \
                     self.actor_critic.evaluate_actions(state=state_batch, latent=latent_batch,
                                                        belief=belief_batch, task=task_batch,
-                                                       action=actions_batch, return_action_mean=True
-                                                       )
+                                                       action=actions_batch)
 
                 ratio = torch.exp(action_log_probs -
                                   old_action_log_probs_batch)

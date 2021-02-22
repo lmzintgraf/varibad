@@ -121,7 +121,7 @@ class RolloutStorageVAE(object):
                     self.running_rewards[self.curr_timestep[i], i] = rewards[i]
                     self.running_actions[self.curr_timestep[i], i] = actions[i]
 
-                    if self.running_tasks[i] is None:
+                    if (self.tasks is not None) and (self.running_tasks[i] is None):
                         self.running_tasks[i] = task[i]
                     self.curr_timestep[i] += 1
 

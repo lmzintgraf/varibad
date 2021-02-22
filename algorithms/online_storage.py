@@ -6,6 +6,8 @@ Used for on-policy rollout storages.
 import torch
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 
+from utils import helpers as utl
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
@@ -47,10 +49,18 @@ class OnlineStorage(object):
             # next_state will include s_N when state was reset, skipping s_0
             # (only used if we need to re-compute embeddings after backpropagating RL loss through encoder)
             self.next_state = torch.zeros(num_steps, num_processes, state_dim)
+        else:
+            self.latent_mean = None
+            self.latent_logvar = None
+            self.latent_samples = None
         if self.args.pass_belief_to_policy:
             self.beliefs = torch.zeros(num_steps + 1, num_processes, belief_dim)
+        else:
+            self.beliefs = None
         if self.args.pass_task_to_policy:
             self.tasks = torch.zeros(num_steps + 1, num_processes, task_dim)
+        else:
+            self.tasks = None
 
         # rewards and end of episodes
         self.rewards_raw = torch.zeros(num_steps, num_processes, 1)
@@ -68,7 +78,7 @@ class OnlineStorage(object):
         self.actions = torch.zeros(num_steps, num_processes, action_shape)
         if action_space.__class__.__name__ == 'Discrete':
             self.actions = self.actions.long()
-        self.action_log_probs = torch.zeros(num_steps, num_processes, 1)
+        self.action_log_probs = None
 
         # values and returns
         self.value_preds = torch.zeros(num_steps + 1, num_processes, 1)
@@ -97,14 +107,12 @@ class OnlineStorage(object):
         self.value_preds = self.value_preds.to(device)
         self.returns = self.returns.to(device)
         self.actions = self.actions.to(device)
-        self.action_log_probs = self.action_log_probs.to(device)
 
     def insert(self,
                state,
                belief,
                task,
                actions,
-               action_log_probs,
                rewards_raw,
                rewards_normalised,
                value_preds,
@@ -128,8 +136,6 @@ class OnlineStorage(object):
             self.latent_logvar.append(latent_logvar.detach().clone())
             self.hidden_states[self.step + 1].copy_(hidden_states.detach())
         self.actions[self.step] = actions.detach().clone()
-        if action_log_probs is not None:
-            self.action_log_probs[self.step].copy_(action_log_probs.detach())
         self.rewards_raw[self.step].copy_(rewards_raw)
         self.rewards_normalised[self.step].copy_(rewards_normalised)
         if isinstance(value_preds, list):
@@ -155,6 +161,7 @@ class OnlineStorage(object):
         self.done[0].copy_(self.done[-1])
         self.masks[0].copy_(self.masks[-1])
         self.bad_masks[0].copy_(self.bad_masks[-1])
+        self.action_log_probs = None
 
     def compute_returns(self, next_value, use_gae, gamma, tau, use_proper_time_limits=True):
 
@@ -198,6 +205,21 @@ class OnlineStorage(object):
 
     def num_transitions(self):
         return len(self.prev_state) * self.num_processes
+
+    def before_update(self, policy):
+        latent = utl.get_latent_for_policy(self.args,
+                                           latent_sample=torch.stack(
+                                               self.latent_samples[:-1]) if self.latent_samples is not None else None,
+                                           latent_mean=torch.stack(
+                                               self.latent_mean[:-1]) if self.latent_mean is not None else None,
+                                           latent_logvar=torch.stack(
+                                               self.latent_logvar[:-1]) if self.latent_mean is not None else None)
+        _, action_log_probs, _ = policy.evaluate_actions(self.prev_state[:-1],
+                                                         latent,
+                                                         self.beliefs[:-1] if self.beliefs is not None else None,
+                                                         self.tasks[:-1] if self.tasks is not None else None,
+                                                         self.actions)
+        self.action_log_probs = action_log_probs.detach()
 
     def feed_forward_generator(self,
                                advantages,
