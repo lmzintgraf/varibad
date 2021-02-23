@@ -427,6 +427,7 @@ def plot_vae_loss(args,
     x = range(len(vae_kl_term))
 
     plt.plot(x, vae_kl_term.cpu().detach().numpy(), 'b-')
+    vae_kl_term = vae_kl_term.cpu()
     for tj in np.cumsum([0, *[num_episode_steps for _ in range(num_rollouts)]]):
         span = vae_kl_term.max() - vae_kl_term.min()
         plt.plot([tj + 0.5, tj + 0.5],
