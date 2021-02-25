@@ -7,7 +7,7 @@ def get_args(rest_args):
 
     # --- GENERAL ---
 
-    parser.add_argument('--num_frames', type=int, default=1e8, help='number of frames to train')
+    parser.add_argument('--num_frames', type=int, default=2e7, help='number of frames to train')
     parser.add_argument('--max_rollouts_per_task', type=int, default=4, help='number of MDP episodes for adaptation')
     parser.add_argument('--exp_label', default='varibad', help='label (typically name of method)')
     parser.add_argument('--env_name', default='GridNavi-v0', help='environment to train on')
@@ -57,10 +57,10 @@ def get_args(rest_args):
                         help='how many training CPU processes / parallel environments to use (default: 16)')
     parser.add_argument('--policy_num_steps', type=int, default=60,
                         help='number of env steps to do (per process) before updating')
-    parser.add_argument('--policy_eps', type=float, default=1e-5, help='optimizer epsilon (1e-8 for ppo, 1e-5 for a2c)')
+    parser.add_argument('--policy_eps', type=float, default=1e-8, help='optimizer epsilon (1e-8 for ppo, 1e-5 for a2c)')
     parser.add_argument('--policy_init_std', type=float, default=1.0, help='only used for continuous actions')
     parser.add_argument('--policy_value_loss_coef', type=float, default=0.5, help='value loss coefficient')
-    parser.add_argument('--policy_entropy_coef', type=float, default=0.1, help='entropy term coefficient')
+    parser.add_argument('--policy_entropy_coef', type=float, default=0.01, help='entropy term coefficient')
     parser.add_argument('--policy_gamma', type=float, default=0.95, help='discount factor for rewards')
     parser.add_argument('--policy_use_gae', type=boolean_argument, default=True,
                         help='use generalized advantage estimation')
@@ -94,7 +94,7 @@ def get_args(rest_args):
     parser.add_argument('--num_vae_updates', type=int, default=3,
                         help='how many VAE update steps to take per meta-iteration')
     parser.add_argument('--pretrain_len', type=int, default=0, help='for how many updates to pre-train the VAE')
-    parser.add_argument('--kl_weight', type=float, default=1, help='weight for the KL term')
+    parser.add_argument('--kl_weight', type=float, default=0.01, help='weight for the KL term')
 
     parser.add_argument('--split_batches_by_task', type=boolean_argument, default=False,
                         help='split batches up by task (to save memory or if tasks are of different length)')
@@ -103,7 +103,7 @@ def get_args(rest_args):
 
     # - encoder
     parser.add_argument('--action_embedding_size', type=int, default=0)
-    parser.add_argument('--state_embedding_size', type=int, default=32)
+    parser.add_argument('--state_embedding_size', type=int, default=8)
     parser.add_argument('--reward_embedding_size', type=int, default=8)
     parser.add_argument('--encoder_layers_before_gru', nargs='+', type=int, default=[])
     parser.add_argument('--encoder_gru_hidden_size', type=int, default=64, help='dimensionality of RNN hidden state')
