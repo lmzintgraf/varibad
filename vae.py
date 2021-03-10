@@ -4,6 +4,7 @@ import gym
 import numpy as np
 import torch
 from torch.nn import functional as F
+import torch.nn as nn
 
 from models.decoder import StateTransitionDecoder, RewardDecoder, TaskDecoder
 from models.encoder import RNNEncoder
@@ -595,10 +596,18 @@ class VaribadVAE:
         if update:
             self.optimiser_vae.zero_grad()
             elbo_loss.backward()
-            self.optimiser_vae.step()
             # clip gradients
-            # nn.utils.clip_grad_norm_(self.encoder.parameters(), self.args.a2c_max_grad_norm)
-            # nn.utils.clip_grad_norm_(reward_decoder.parameters(), self.args.max_grad_norm)
+            if self.args.encoder_max_grad_norm is not None:
+                nn.utils.clip_grad_norm_(self.encoder.parameters(), self.args.encoder_max_grad_norm)
+            if self.args.decoder_max_grad_norm is not None:
+                if self.args.decode_reward:
+                    nn.utils.clip_grad_norm_(self.reward_decoder.parameters(), self.args.decoder_max_grad_norm)
+                if self.args.decode_state:
+                    nn.utils.clip_grad_norm_(self.state_decoder.parameters(), self.args.decoder_max_grad_norm)
+                if self.args.decode_task:
+                    nn.utils.clip_grad_norm_(self.task_decoder.parameters(), self.args.decoder_max_grad_norm)
+            # update
+            self.optimiser_vae.step()
 
         self.log(elbo_loss, rew_reconstruction_loss, state_reconstruction_loss, task_reconstruction_loss, kl_loss,
                  pretrain_index)
