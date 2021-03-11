@@ -39,7 +39,7 @@ def worker(remote, parent_remote, env_fn_wrapper):
             elif cmd == 'belief_dim':
                 remote.send(env.belief_dim)
             elif cmd == 'reset_task':
-                env.unwrapped.reset_task()
+                env.unwrapped.reset_task(data)
             else:
                 # try to get the attribute directly
                 remote.send(getattr(env.unwrapped, cmd))
