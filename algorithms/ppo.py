@@ -148,9 +148,12 @@ class PPO:
 
                 # compute gradients (will attach to all networks involved in this computation)
                 loss.backward()
+
+                # clip gradients
                 nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.args.policy_max_grad_norm)
-                if (encoder is not None) and rlloss_through_encoder:
-                    nn.utils.clip_grad_norm_(encoder.parameters(), self.args.policy_max_grad_norm)
+                if rlloss_through_encoder:
+                    if self.args.encoder_max_grad_norm is not None:
+                        nn.utils.clip_grad_norm_(encoder.parameters(), self.args.encoder_max_grad_norm)
 
                 # update
                 self.optimiser.step()
