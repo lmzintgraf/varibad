@@ -59,7 +59,7 @@ def get_args(rest_args):
 
     # PPO specific
     parser.add_argument('--ppo_num_epochs', type=int, default=2, help='number of epochs per PPO update')
-    parser.add_argument('--ppo_num_minibatch', type=int, default=2, help='number of minibatches to split the data')
+    parser.add_argument('--ppo_num_minibatch', type=int, default=1, help='number of minibatches to split the data')
     parser.add_argument('--ppo_use_huberloss', type=boolean_argument, default=True, help='use huberloss instead of MSE')
     parser.add_argument('--ppo_use_clipped_value_loss', type=boolean_argument, default=True, help='clip value loss')
     parser.add_argument('--ppo_clip_param', type=float, default=0.05, help='clamp param')
@@ -83,6 +83,8 @@ def get_args(rest_args):
     parser.add_argument('--use_proper_time_limits', type=boolean_argument, default=True,
                         help='treat timeout and death differently (important in mujoco)')
     parser.add_argument('--policy_max_grad_norm', type=float, default=0.5, help='max norm of gradients')
+    parser.add_argument('--encoder_max_grad_norm', type=float, default=0.5, help='max norm of gradients')
+    parser.add_argument('--decoder_max_grad_norm', type=float, default=None, help='max norm of gradients')
 
     # --- VAE TRAINING ---
 
