@@ -304,6 +304,8 @@ def get_task_dim(args):
                         gamma=args.policy_gamma, device=device,
                         episodes_per_task=args.max_rollouts_per_task,
                         normalise_rew=args.norm_rew_for_policy, ret_rms=None,
+                        args=args,
+                        tasks=None
                         )
     return env.task_dim
 
@@ -313,6 +315,8 @@ def get_num_tasks(args):
                         gamma=args.policy_gamma, device=device,
                         episodes_per_task=args.max_rollouts_per_task,
                         normalise_rew=args.norm_rew_for_policy, ret_rms=None,
+                        args=args,
+                        tasks=None
                         )
     try:
         num_tasks = env.num_tasks

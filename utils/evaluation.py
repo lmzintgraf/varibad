@@ -12,6 +12,7 @@ def evaluate(args,
              policy,
              ret_rms,
              iter_idx,
+             tasks,
              encoder=None,
              num_episodes=None
              ):
@@ -37,7 +38,9 @@ def evaluate(args,
                          device=device,
                          rank_offset=num_processes + 1,  # to use diff tmp folders than main processes
                          episodes_per_task=num_episodes,
-                         normalise_rew=args.norm_rew_for_policy, ret_rms=ret_rms)
+                         normalise_rew=args.norm_rew_for_policy, ret_rms=ret_rms,
+                         tasks=tasks,
+                         )
     num_steps = envs._max_episode_steps
 
     # reset environments
@@ -58,14 +61,14 @@ def evaluate(args,
 
             with torch.no_grad():
                 _, action = utl.select_action(args=args,
-                                                 policy=policy,
-                                                 state=state,
-                                                 belief=belief,
-                                                 task=task,
-                                                 latent_sample=latent_sample,
-                                                 latent_mean=latent_mean,
-                                                 latent_logvar=latent_logvar,
-                                                 deterministic=True)
+                                              policy=policy,
+                                              state=state,
+                                              belief=belief,
+                                              task=task,
+                                              latent_sample=latent_sample,
+                                              latent_mean=latent_mean,
+                                              latent_logvar=latent_logvar,
+                                              deterministic=True)
 
             # observe reward and next obs
             [state, belief, task], (rew_raw, rew_normalised), done, infos = utl.env_step(envs, action, args)
@@ -99,6 +102,7 @@ def visualise_behaviour(args,
                         image_folder,
                         iter_idx,
                         ret_rms,
+                        tasks,
                         encoder=None,
                         reward_decoder=None,
                         state_decoder=None,
@@ -117,6 +121,7 @@ def visualise_behaviour(args,
                         episodes_per_task=args.max_rollouts_per_task,
                         normalise_rew=args.norm_rew_for_policy, ret_rms=ret_rms,
                         rank_offset=args.num_processes + 42,  # not sure if the temp folders would otherwise clash
+                        tasks=tasks
                         )
     episode_task = torch.from_numpy(np.array(env.get_task())).to(device).float()
 

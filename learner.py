@@ -44,7 +44,23 @@ class Learner:
                                   gamma=args.policy_gamma, device=device,
                                   episodes_per_task=self.args.max_rollouts_per_task,
                                   normalise_rew=args.norm_rew_for_policy, ret_rms=None,
+                                  tasks=None
                                   )
+
+        if self.args.single_task_mode:
+            # get the current tasks (which will be num_process many different tasks)
+            self.train_tasks = self.envs.get_task()
+            # set the tasks to the first task (i.e. just a random task)
+            self.train_tasks[1:] = self.train_tasks[0]
+            # re-initialise environments with those tasks
+            self.envs = make_vec_envs(env_name=args.env_name, seed=args.seed, num_processes=args.num_processes,
+                                      gamma=args.policy_gamma, device=device,
+                                      episodes_per_task=self.args.max_rollouts_per_task,
+                                      normalise_rew=args.norm_rew_for_policy, ret_rms=None,
+                                      tasks=self.train_tasks,
+                                      )
+        else:
+            self.train_tasks = None
 
         # calculate what the maximum length of the trajectories is
         args.max_trajectory_len = self.envs._max_episode_steps
@@ -245,6 +261,7 @@ class Learner:
                                          image_folder=self.logger.full_output_folder,
                                          iter_idx=self.iter_idx,
                                          ret_rms=ret_rms,
+                                         tasks=self.train_tasks,
                                          )
 
         # --- evaluate policy ----
@@ -256,7 +273,8 @@ class Learner:
             returns_per_episode = utl_eval.evaluate(args=self.args,
                                                     policy=self.policy,
                                                     ret_rms=ret_rms,
-                                                    iter_idx=self.iter_idx
+                                                    iter_idx=self.iter_idx,
+                                                    tasks=self.train_tasks,
                                                     )
 
             # log the average return across tasks (=processes)

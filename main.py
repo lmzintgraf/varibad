@@ -26,7 +26,7 @@ from metalearner import MetaLearner
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env-type', default='ant_dir_expert')
+    parser.add_argument('--env-type', default='ant_dir_multitask')
     args, rest_args = parser.parse_known_args()
     env = args.env_type
 
@@ -41,28 +41,6 @@ def main():
 
     # --- MUJOCO ---
 
-    # - AntDir -
-    elif env == 'ant_dir_multitask':
-        args = args_ant_dir_multitask.get_args(rest_args)
-    elif env == 'ant_dir_expert':
-        args = args_ant_dir_expert.get_args(rest_args)
-    elif env == 'ant_dir_varibad':
-        args = args_ant_dir_varibad.get_args(rest_args)
-    elif env == 'ant_dir_rl2':
-        args = args_ant_dir_rl2.get_args(rest_args)
-    #
-    # - AntGoal -
-    elif env == 'ant_goal_multitask':
-        args = args_ant_goal_multitask.get_args(rest_args)
-    elif env == 'ant_goal_expert':
-        args = args_ant_goal_expert.get_args(rest_args)
-    elif env == 'ant_goal_varibad':
-        args = args_ant_goal_varibad.get_args(rest_args)
-    elif env == 'ant_goal_humplik':
-        args = args_ant_goal_humplik.get_args(rest_args)
-    elif env == 'ant_goal_rl2':
-        args = args_ant_goal_rl2.get_args(rest_args)
-    #
     # - CheetahDir -
     elif env == 'cheetah_dir_multitask':
         args = args_cheetah_dir_multitask.get_args(rest_args)
@@ -84,6 +62,28 @@ def main():
         args = args_cheetah_vel_varibad.get_args(rest_args)
     elif env == 'cheetah_vel_rl2':
         args = args_cheetah_vel_rl2.get_args(rest_args)
+    #
+    # - AntDir -
+    elif env == 'ant_dir_multitask':
+        args = args_ant_dir_multitask.get_args(rest_args)
+    elif env == 'ant_dir_expert':
+        args = args_ant_dir_expert.get_args(rest_args)
+    elif env == 'ant_dir_varibad':
+        args = args_ant_dir_varibad.get_args(rest_args)
+    elif env == 'ant_dir_rl2':
+        args = args_ant_dir_rl2.get_args(rest_args)
+    #
+    # - AntGoal -
+    elif env == 'ant_goal_multitask':
+        args = args_ant_goal_multitask.get_args(rest_args)
+    elif env == 'ant_goal_expert':
+        args = args_ant_goal_expert.get_args(rest_args)
+    elif env == 'ant_goal_varibad':
+        args = args_ant_goal_varibad.get_args(rest_args)
+    elif env == 'ant_goal_humplik':
+        args = args_ant_goal_humplik.get_args(rest_args)
+    elif env == 'ant_goal_rl2':
+        args = args_ant_goal_rl2.get_args(rest_args)
     #
     # - Walker -
     elif env == 'walker_multitask':
