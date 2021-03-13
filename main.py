@@ -10,13 +10,15 @@ import torch
 
 # get configs
 from config.gridworld import \
-    args_grid_oracle, args_grid_belief_oracle, args_grid_rl2, args_grid_varibad
+    args_grid_belief_oracle, args_grid_rl2, args_grid_varibad
 from config.mujoco import \
-    args_cheetah_dir_oracle, args_cheetah_dir_rl2, args_cheetah_dir_varibad, \
-    args_cheetah_vel_oracle, args_cheetah_vel_rl2, args_cheetah_vel_varibad, args_cheetah_vel_avg, \
-    args_ant_dir_oracle, args_ant_dir_rl2, args_ant_dir_varibad, \
-    args_ant_goal_oracle, args_ant_goal_rl2, args_ant_goal_varibad, \
-    args_walker_oracle, args_walker_avg, args_walker_rl2, args_walker_varibad
+    args_cheetah_dir_multitask, args_cheetah_dir_expert, args_cheetah_dir_rl2, args_cheetah_dir_varibad, \
+    args_cheetah_vel_multitask, args_cheetah_vel_expert, args_cheetah_vel_rl2, args_cheetah_vel_varibad, \
+    args_cheetah_vel_avg, \
+    args_ant_dir_multitask, args_ant_dir_expert, args_ant_dir_rl2, args_ant_dir_varibad, \
+    args_ant_goal_multitask, args_ant_goal_expert, args_ant_goal_rl2, args_ant_goal_varibad, \
+    args_ant_goal_humplik, \
+    args_walker_multitask, args_walker_expert, args_walker_avg, args_walker_rl2, args_walker_varibad
 from environments.parallel_envs import make_vec_envs
 from learner import Learner
 from metalearner import MetaLearner
@@ -24,15 +26,13 @@ from metalearner import MetaLearner
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env-type', default='cheetah_vel_avg')
+    parser.add_argument('--env-type', default='ant_dir_expert')
     args, rest_args = parser.parse_known_args()
     env = args.env_type
 
     # --- GridWorld ---
 
-    if env == 'gridworld_oracle':
-        args = args_grid_oracle.get_args(rest_args)
-    elif env == 'gridworld_belief_oracle':
+    if env == 'gridworld_belief_oracle':
         args = args_grid_belief_oracle.get_args(rest_args)
     elif env == 'gridworld_varibad':
         args = args_grid_varibad.get_args(rest_args)
@@ -42,48 +42,60 @@ def main():
     # --- MUJOCO ---
 
     # - AntDir -
-    elif env == 'ant_dir_oracle':
-        args = args_ant_dir_oracle.get_args(rest_args)
-    elif env == 'ant_dir_rl2':
-        args = args_ant_dir_rl2.get_args(rest_args)
+    elif env == 'ant_dir_multitask':
+        args = args_ant_dir_multitask.get_args(rest_args)
+    elif env == 'ant_dir_expert':
+        args = args_ant_dir_expert.get_args(rest_args)
     elif env == 'ant_dir_varibad':
         args = args_ant_dir_varibad.get_args(rest_args)
+    elif env == 'ant_dir_rl2':
+        args = args_ant_dir_rl2.get_args(rest_args)
     #
     # - AntGoal -
-    elif env == 'ant_goal_oracle':
-        args = args_ant_goal_oracle.get_args(rest_args)
+    elif env == 'ant_goal_multitask':
+        args = args_ant_goal_multitask.get_args(rest_args)
+    elif env == 'ant_goal_expert':
+        args = args_ant_goal_expert.get_args(rest_args)
     elif env == 'ant_goal_varibad':
         args = args_ant_goal_varibad.get_args(rest_args)
+    elif env == 'ant_goal_humplik':
+        args = args_ant_goal_humplik.get_args(rest_args)
     elif env == 'ant_goal_rl2':
         args = args_ant_goal_rl2.get_args(rest_args)
     #
     # - CheetahDir -
-    elif env == 'cheetah_dir_oracle':
-        args = args_cheetah_dir_oracle.get_args(rest_args)
-    elif env == 'cheetah_dir_rl2':
-        args = args_cheetah_dir_rl2.get_args(rest_args)
+    elif env == 'cheetah_dir_multitask':
+        args = args_cheetah_dir_multitask.get_args(rest_args)
+    elif env == 'cheetah_dir_expert':
+        args = args_cheetah_dir_expert.get_args(rest_args)
     elif env == 'cheetah_dir_varibad':
         args = args_cheetah_dir_varibad.get_args(rest_args)
+    elif env == 'cheetah_dir_rl2':
+        args = args_cheetah_dir_rl2.get_args(rest_args)
     #
     # - CheetahVel -
-    elif env == 'cheetah_vel_oracle':
-        args = args_cheetah_vel_oracle.get_args(rest_args)
-    elif env == 'cheetah_vel_rl2':
-        args = args_cheetah_vel_rl2.get_args(rest_args)
-    elif env == 'cheetah_vel_varibad':
-        args = args_cheetah_vel_varibad.get_args(rest_args)
+    elif env == 'cheetah_vel_multitask':
+        args = args_cheetah_vel_multitask.get_args(rest_args)
+    elif env == 'cheetah_vel_expert':
+        args = args_cheetah_vel_expert.get_args(rest_args)
     elif env == 'cheetah_vel_avg':
         args = args_cheetah_vel_avg.get_args(rest_args)
+    elif env == 'cheetah_vel_varibad':
+        args = args_cheetah_vel_varibad.get_args(rest_args)
+    elif env == 'cheetah_vel_rl2':
+        args = args_cheetah_vel_rl2.get_args(rest_args)
     #
     # - Walker -
-    elif env == 'walker_oracle':
-        args = args_walker_oracle.get_args(rest_args)
+    elif env == 'walker_multitask':
+        args = args_walker_multitask.get_args(rest_args)
+    elif env == 'walker_expert':
+        args = args_walker_expert.get_args(rest_args)
     elif env == 'walker_avg':
         args = args_walker_avg.get_args(rest_args)
-    elif env == 'walker_rl2':
-        args = args_walker_rl2.get_args(rest_args)
     elif env == 'walker_varibad':
         args = args_walker_varibad.get_args(rest_args)
+    elif env == 'walker_rl2':
+        args = args_walker_rl2.get_args(rest_args)
 
     # warning for deterministic execution
     if args.deterministic_execution:
@@ -101,6 +113,7 @@ def main():
                              gamma=args.policy_gamma, device='cpu',
                              episodes_per_task=args.max_rollouts_per_task,
                              normalise_rew=args.norm_rew_for_policy, ret_rms=None,
+                             tasks=None,
                              )
         assert np.unique(envs.action_space.low) == [-1]
         assert np.unique(envs.action_space.high) == [1]
