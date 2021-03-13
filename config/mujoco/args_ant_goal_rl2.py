@@ -162,6 +162,8 @@ def get_args(rest_args):
                         help='KL term in ELBO to fixed Gaussian prior (instead of prev approx posterior)')
     parser.add_argument('--decode_only_past', type=boolean_argument, default=False,
                         help='only decoder past observations, not the future')
+    parser.add_argument('--single_task_mode', type=boolean_argument, default=False,
+                        help='train policy on one (randomly chosen) environment only')
 
     # --- OTHERS ---
 

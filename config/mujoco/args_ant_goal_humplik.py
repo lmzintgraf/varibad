@@ -9,7 +9,7 @@ def get_args(rest_args):
 
     parser.add_argument('--num_frames', type=int, default=1e8, help='number of frames to train')
     parser.add_argument('--max_rollouts_per_task', type=int, default=2, help='number of MDP episodes for adaptation')
-    parser.add_argument('--exp_label', default='varibad', help='label (typically name of method)')
+    parser.add_argument('--exp_label', default='humplik', help='label (typically name of method)')
     parser.add_argument('--env_name', default='AntGoal-v0', help='environment to train on')
 
     # --- POLICY ---
@@ -69,6 +69,8 @@ def get_args(rest_args):
     parser.add_argument('--use_proper_time_limits', type=boolean_argument, default=True,
                         help='treat timeout and death differently (important in mujoco)')
     parser.add_argument('--policy_max_grad_norm', type=float, default=0.5, help='max norm of gradients')
+    parser.add_argument('--encoder_max_grad_norm', type=float, default=1.0, help='max norm of gradients')
+    parser.add_argument('--decoder_max_grad_norm', type=float, default=1.0, help='max norm of gradients')
 
     # --- VAE TRAINING ---
 
@@ -92,7 +94,7 @@ def get_args(rest_args):
                         help='Average ELBO terms (instead of sum)')
     parser.add_argument('--vae_avg_reconstruction_terms', type=boolean_argument, default=False,
                         help='Average reconstruction terms (instead of sum)')
-    parser.add_argument('--num_vae_updates', type=int, default=10,
+    parser.add_argument('--num_vae_updates', type=int, default=5,
                         help='how many VAE update steps to take per meta-iteration')
     parser.add_argument('--pretrain_len', type=int, default=0, help='for how many updates to pre-train the VAE')
     parser.add_argument('--kl_weight', type=float, default=0.1, help='weight for the KL term')
@@ -157,6 +159,8 @@ def get_args(rest_args):
                         help='KL term in ELBO to fixed Gaussian prior (instead of prev approx posterior)')
     parser.add_argument('--decode_only_past', type=boolean_argument, default=False,
                         help='only decoder past observations, not the future')
+    parser.add_argument('--single_task_mode', type=boolean_argument, default=False,
+                        help='train policy on one (randomly chosen) environment only')
 
     # --- OTHERS ---
 
