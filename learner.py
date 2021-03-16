@@ -52,6 +52,8 @@ class Learner:
             self.train_tasks = self.envs.get_task()
             # set the tasks to the first task (i.e. just a random task)
             self.train_tasks[1:] = self.train_tasks[0]
+            # make it a list
+            self.train_tasks = [t for t in self.train_tasks]
             # re-initialise environments with those tasks
             self.envs = make_vec_envs(env_name=args.env_name, seed=args.seed, num_processes=args.num_processes,
                                       gamma=args.policy_gamma, device=device,
@@ -59,6 +61,8 @@ class Learner:
                                       normalise_rew=args.norm_rew_for_policy, ret_rms=None,
                                       tasks=self.train_tasks,
                                       )
+            # save the training tasks so we can evaluate on the same envs later
+            utl.save_obj(self.train_tasks, self.logger.full_output_folder, "train_tasks")
         else:
             self.train_tasks = None
 
