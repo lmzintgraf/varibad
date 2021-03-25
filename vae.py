@@ -182,8 +182,9 @@ class VaribadVAE:
                 raise NotImplementedError
         else:
             rew_pred = self.reward_decoder(latent, next_obs, prev_obs, action.float())
-            rew_target = (rew_pred == 1).float()
-            if self.args.rew_pred_type == 'bernoulli':
+            if self.args.rew_pred_type == 'bernoulli':  # TODO: untested!
+                rew_pred = torch.sigmoid(rew_pred)
+                rew_target = (reward == 1).float()  # TODO: necessary?
                 loss_rew = F.binary_cross_entropy(rew_pred, rew_target, reduction='none').mean(dim=-1)
             elif self.args.rew_pred_type == 'deterministic':
                 loss_rew = (rew_pred - reward).pow(2).mean(dim=-1)

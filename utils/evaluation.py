@@ -33,13 +33,17 @@ def evaluate(args,
 
     # --- initialise environments and latents ---
 
-    envs = make_vec_envs(env_name, seed=args.seed * 42 + iter_idx, num_processes=num_processes,
+    envs = make_vec_envs(env_name,
+                         seed=args.seed * 42 + iter_idx,
+                         num_processes=num_processes,
                          gamma=args.policy_gamma,
                          device=device,
                          rank_offset=num_processes + 1,  # to use diff tmp folders than main processes
                          episodes_per_task=num_episodes,
-                         normalise_rew=args.norm_rew_for_policy, ret_rms=ret_rms,
+                         normalise_rew=args.norm_rew_for_policy,
+                         ret_rms=ret_rms,
                          tasks=tasks,
+                         add_done_info=args.max_rollouts_per_task > 1,
                          )
     num_steps = envs._max_episode_steps
 
@@ -90,7 +94,8 @@ def evaluate(args,
                 # count task up, but cap at num_episodes + 1
                 task_count[i] = min(task_count[i] + 1, num_episodes)  # zero-indexed, so no +1
             if np.sum(done) > 0:
-                state, belief, task = utl.reset_env(envs, args, indices=done, state=state)
+                done_indices = np.argwhere(done.flatten()).flatten()
+                state, belief, task = utl.reset_env(envs, args, indices=done_indices, state=state)
 
     envs.close()
 

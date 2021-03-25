@@ -49,6 +49,8 @@ class AntDirEnv(AntEnv):
         return [random.choice([-1.0, 1.0]) for _ in range(n_tasks, )]
 
     def set_task(self, task):
+        if isinstance(task, np.ndarray):
+            task = task[0]
         self.goal_direction = task
 
     def get_task(self):

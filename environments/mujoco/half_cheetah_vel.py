@@ -48,6 +48,8 @@ class HalfCheetahVelEnv(HalfCheetahEnv):
         return observation, reward, done, infos
 
     def set_task(self, task):
+        if isinstance(task, np.ndarray):
+            task = task[0]
         self.goal_velocity = task
 
     def get_task(self):

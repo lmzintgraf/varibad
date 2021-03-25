@@ -125,6 +125,14 @@ class RandomEnv(MetaEnv, MujocoEnv):
         return param_sets
 
     def set_task(self, task):
+        if isinstance(task, np.ndarray):
+            new_task = {}
+            start_idx = 0
+            for k in self.curr_params.keys():
+                end_idx = np.prod(self.curr_params[k].shape)
+                new_task[k] = task[start_idx:start_idx+end_idx].reshape(self.curr_params[k].shape)
+                start_idx += end_idx
+            task = new_task
         for param, param_val in task.items():
             param_variable = getattr(self.model, param)
             assert param_variable.shape == param_val.shape, 'shapes of new parameter value and old one must match'
