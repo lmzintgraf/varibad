@@ -88,7 +88,7 @@ class A2C:
             values, action_log_probs, dist_entropy = \
                 self.actor_critic.evaluate_actions(state=state_batch, latent=latent_batch,
                                                    belief=belief_batch, task=task_batch,
-                                                   actions=actions_batch)
+                                                   action=actions_batch)
 
             # --  UPDATE --
 
