@@ -158,7 +158,7 @@ def visualise_behaviour(args,
                      iter_idx=iter_idx
                      )
 
-        if not (args.disable_stochasticity_in_latent and args.disable_decoder):
+        if not (args.disable_decoder and args.disable_kl_term):
             plot_vae_loss(args,
                           latent_means,
                           latent_logvars,

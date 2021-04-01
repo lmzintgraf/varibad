@@ -83,7 +83,7 @@ class VaribadVAE:
             return None, None, None
 
         latent_dim = self.args.latent_dim
-        # double latent dimension (input size to decoder) if we use a deterministic latents (for easier comparison)
+        # if we don't sample embeddings for the decoder, we feed in mean & variance
         if self.args.disable_stochasticity_in_latent:
             latent_dim *= 2
 
@@ -402,7 +402,7 @@ class VaribadVAE:
         else:
             task_reconstruction_loss = 0
 
-        if not self.args.disable_stochasticity_in_latent:
+        if not self.args.disable_kl_term:
             # compute the KL term for each ELBO term of the current trajectory
             # shape: [num_elbo_terms] x [num_trajectories]
             kl_loss = self.compute_kl_loss(latent_mean, latent_logvar, elbo_indices)
@@ -527,7 +527,7 @@ class VaribadVAE:
         else:
             task_reconstruction_loss = 0
 
-        if not self.args.disable_stochasticity_in_latent:
+        if not self.args.disable_kl_term:
             # compute the KL term for each ELBO term of the current trajectory
             kl_loss = self.compute_kl_loss(latent_mean, latent_logvar, None)
             # sum the elbos, average across tasks
@@ -543,7 +543,7 @@ class VaribadVAE:
         if not self.rollout_storage.ready_for_update():
             return 0
 
-        if self.args.disable_decoder and self.args.disable_stochasticity_in_latent:
+        if self.args.disable_decoder and self.args.disable_kl_term:
             return 0
 
         # get a mini-batch
@@ -582,7 +582,7 @@ class VaribadVAE:
                 self.args.kl_weight * kl_loss).mean()
 
         # make sure we can compute gradients
-        if not self.args.disable_stochasticity_in_latent:
+        if not self.args.disable_kl_term:
             assert kl_loss.requires_grad
         if self.args.decode_reward:
             assert rew_reconstruction_loss.requires_grad
@@ -633,6 +633,6 @@ class VaribadVAE:
             if self.args.decode_task:
                 self.logger.add('vae_losses/task_reconstr_err', task_reconstruction_loss.mean(), curr_iter_idx)
 
-            if not self.args.disable_stochasticity_in_latent:
+            if not self.args.disable_kl_term:
                 self.logger.add('vae_losses/kl', kl_loss.mean(), curr_iter_idx)
             self.logger.add('vae_losses/sum', elbo_loss, curr_iter_idx)

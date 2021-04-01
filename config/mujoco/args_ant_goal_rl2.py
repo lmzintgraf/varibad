@@ -16,6 +16,8 @@ def get_args(rest_args):
 
     parser.add_argument('--disable_decoder', type=boolean_argument, default=True,
                         help='train without decoder')
+    parser.add_argument('--disable_kl_term', type=boolean_argument, default=True,
+                        help='dont use the KL regularising loss term')
     parser.add_argument('--add_nonlinearity_to_latent', type=boolean_argument, default=True,
                         help='Use relu before feeding latent to policy')
     parser.add_argument('--rlloss_through_encoder', type=boolean_argument, default=True,
@@ -150,18 +152,17 @@ def get_args(rest_args):
 
     # --- ABLATIONS ---
 
-    parser.add_argument('--disable_metalearner', type=boolean_argument, default=False,
-                        help='Train feedforward policy')
-    parser.add_argument('--disable_stochasticity_in_latent', type=boolean_argument, default=False,
-                        help='use auto-encoder (non-variational)')
+    # for the policy training
     parser.add_argument('--sample_embeddings', type=boolean_argument, default=False,
                         help='sample embedding for policy, instead of full belief')
+
+    # combining vae and RL loss
     parser.add_argument('--vae_loss_coeff', type=float, default=1.0,
                         help='weight for VAE loss (vs RL loss)')
-    parser.add_argument('--kl_to_gauss_prior', type=boolean_argument, default=False,
-                        help='KL term in ELBO to fixed Gaussian prior (instead of prev approx posterior)')
-    parser.add_argument('--decode_only_past', type=boolean_argument, default=False,
-                        help='only decoder past observations, not the future')
+
+    # for other things
+    parser.add_argument('--disable_metalearner', type=boolean_argument, default=False,
+                        help='Train feedforward policy')
     parser.add_argument('--single_task_mode', type=boolean_argument, default=False,
                         help='train policy on one (randomly chosen) environment only')
 

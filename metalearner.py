@@ -221,7 +221,7 @@ class MetaLearner:
 
                 # before resetting, update the embedding and add to vae buffer
                 # (last state might include useful task info)
-                if not (self.args.disable_decoder and self.args.disable_stochasticity_in_latent):
+                if not (self.args.disable_decoder and self.args.disable_kl_term):
                     self.vae.rollout_storage.insert(prev_state.clone(),
                                                     action.detach().clone(),
                                                     next_state.clone(),
