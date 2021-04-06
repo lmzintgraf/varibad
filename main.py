@@ -143,6 +143,7 @@ def main():
     for seed in seed_list:
         print('training', seed)
         args.seed = seed
+        args.action_space = None
 
         if args.disable_metalearner:
             # If `disable_metalearner` is true, the file `learner.py` will be used instead of `metalearner.py`.
