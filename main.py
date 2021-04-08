@@ -12,7 +12,7 @@ import torch
 from config.gridworld import \
     args_grid_belief_oracle, args_grid_rl2, args_grid_varibad
 from config.pointrobot import \
-    args_pointrobot_multitask, args_pointrobot_varibad
+    args_pointrobot_multitask, args_pointrobot_varibad, args_pointrobot_rl2
 from config.mujoco import \
     args_cheetah_dir_multitask, args_cheetah_dir_expert, args_cheetah_dir_rl2, args_cheetah_dir_varibad, \
     args_cheetah_vel_multitask, args_cheetah_vel_expert, args_cheetah_vel_rl2, args_cheetah_vel_varibad, \
@@ -47,6 +47,8 @@ def main():
         args = args_pointrobot_multitask.get_args(rest_args)
     elif env == 'pointrobot_varibad':
         args = args_pointrobot_varibad.get_args(rest_args)
+    elif env == 'pointrobot_rl2':
+        args = args_pointrobot_rl2.get_args(rest_args)
 
     # --- MUJOCO ---
 
