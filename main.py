@@ -12,7 +12,7 @@ import torch
 from config.gridworld import \
     args_grid_belief_oracle, args_grid_rl2, args_grid_varibad
 from config.pointrobot import \
-    args_pointrobot_multitask, args_pointrobot_varibad, args_pointrobot_rl2
+    args_pointrobot_multitask, args_pointrobot_varibad, args_pointrobot_rl2, args_pointrobot_humplik
 from config.mujoco import \
     args_cheetah_dir_multitask, args_cheetah_dir_expert, args_cheetah_dir_rl2, args_cheetah_dir_varibad, \
     args_cheetah_vel_multitask, args_cheetah_vel_expert, args_cheetah_vel_rl2, args_cheetah_vel_varibad, \
@@ -28,7 +28,7 @@ from metalearner import MetaLearner
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env-type', default='gridworld_varibad')
+    parser.add_argument('--env-type', default='pointrobot_humplik')
     args, rest_args = parser.parse_known_args()
     env = args.env_type
 
@@ -49,6 +49,8 @@ def main():
         args = args_pointrobot_varibad.get_args(rest_args)
     elif env == 'pointrobot_rl2':
         args = args_pointrobot_rl2.get_args(rest_args)
+    elif env == 'pointrobot_humplik':
+        args = args_pointrobot_humplik.get_args(rest_args)
 
     # --- MUJOCO ---
 
