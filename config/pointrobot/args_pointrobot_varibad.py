@@ -35,7 +35,6 @@ def get_args(rest_args):
     parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=True, help='normalise rew for RL train')
     parser.add_argument('--norm_actions_pre_sampling', type=boolean_argument, default=True, help='normalise policy output')
     parser.add_argument('--norm_actions_post_sampling', type=boolean_argument, default=False, help='normalise policy output')
-    parser.add_argument('--norm_rew_clip_param', type=float, default=100000, help='rew clip param')
 
     # network
     parser.add_argument('--policy_layers', nargs='+', default=[128, 128, 128])
