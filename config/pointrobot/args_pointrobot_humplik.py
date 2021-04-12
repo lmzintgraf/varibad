@@ -10,7 +10,7 @@ def get_args(rest_args):
     # training parameters
     parser.add_argument('--num_frames', type=int, default=5e7, help='number of frames to train')
     parser.add_argument('--max_rollouts_per_task', type=int, default=3)
-    parser.add_argument('--exp_label', default='varibad', help='label (typically name of method)')
+    parser.add_argument('--exp_label', default='humplik', help='label (typically name of method)')
     parser.add_argument('--env_name', default='SparsePointEnv-v0', help='environment to train on')
 
     # --- POLICY ---
@@ -115,7 +115,7 @@ def get_args(rest_args):
     parser.add_argument('--latent_dim', type=int, default=5, help='dimensionality of latent space')
 
     # - decoder: rewards
-    parser.add_argument('--decode_reward', type=boolean_argument, default=True, help='use reward decoder')
+    parser.add_argument('--decode_reward', type=boolean_argument, default=False, help='use reward decoder')
     parser.add_argument('--normalise_rew_targets', type=boolean_argument, default=False, help='divide reward targets by largest rew seen')
     parser.add_argument('--rew_loss_coeff', type=float, default=1.0, help='weight for state loss (vs reward loss)')
     parser.add_argument('--input_prev_state', type=boolean_argument, default=True, help='use prev state for rew pred')
@@ -136,10 +136,10 @@ def get_args(rest_args):
     parser.add_argument('--state_pred_type', type=str, default='deterministic', help='choose: deterministic, gaussian')
 
     # - decoder: ground-truth task ("varibad oracle", after Humplik et al. 2019)
-    parser.add_argument('--decode_task', type=boolean_argument, default=False, help='use task decoder')
+    parser.add_argument('--decode_task', type=boolean_argument, default=True, help='use task decoder')
     parser.add_argument('--task_loss_coeff', type=float, default=1.0, help='weight for task loss')
     parser.add_argument('--task_decoder_layers', nargs='+', type=int, default=[64, 32])
-    parser.add_argument('--task_pred_type', type=str, default='task_id', help='choose: task_id, task_description')
+    parser.add_argument('--task_pred_type', type=str, default='task_description', help='choose: task_id, task_description')
 
     # --- ABLATIONS ---
 

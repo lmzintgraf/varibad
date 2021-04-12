@@ -9,8 +9,6 @@ import seaborn as sns
 from gym import Env
 from gym import spaces
 
-# from environments.navigation.point_robot_util import *
-
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
