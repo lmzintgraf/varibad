@@ -276,7 +276,12 @@ class VaribadVAE:
         """
 
         num_unique_trajectory_lens = len(np.unique(trajectory_lens))
-        assert (num_unique_trajectory_lens == 1) or (self.args.vae_subsample_elbos and self.args.vae_subsample_decodes)
+
+        if 'Humanoid' in self.args.env_name:
+            # The agent can die in the humanoid environment, so traj. lengths will not be the same but that's alright.
+            pass
+        else:
+            assert (num_unique_trajectory_lens == 1) or (self.args.vae_subsample_elbos and self.args.vae_subsample_decodes)
         assert not self.args.decode_only_past
 
         # cut down the batch to the longest trajectory length
