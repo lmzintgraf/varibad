@@ -82,6 +82,8 @@ def get_args(rest_args):
     parser.add_argument('--use_proper_time_limits', type=boolean_argument, default=True,
                         help='treat timeout and death differently (important in mujoco)')
     parser.add_argument('--policy_max_grad_norm', type=float, default=0.5, help='max norm of gradients')
+    parser.add_argument('--encoder_max_grad_norm', type=float, default=0.5, help='max norm of gradients')
+    parser.add_argument('--decoder_max_grad_norm', type=float, default=None, help='max norm of gradients')
 
     # --- VAE TRAINING ---
 
