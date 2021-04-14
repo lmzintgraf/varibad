@@ -6,6 +6,8 @@ import numpy as np
 from gym.envs.mujoco import HumanoidEnv as HumanoidEnv
 from gym import spaces
 
+import random
+
 def mass_center(model, sim):
     mass = np.expand_dims(model.body_mass, 1)
     xpos = sim.data.xipos
@@ -82,7 +84,4 @@ class HumanoidDirEnv(HumanoidEnv):
         return np.array([self._goal])
 
     def sample_tasks(self, num_tasks):
-        # velocities = np.random.uniform(0., 1.0 * np.pi, size=(num_tasks,))
-        goals = np.random.uniform(0., 2.0 * np.pi, size=(num_tasks,))
-        # tasks = [{'goal': d} for d in directions]
-        return goals
+        return [random.uniform(0., 2.0 * np.pi) for _ in range(num_tasks)]
