@@ -87,7 +87,10 @@ class RewardDecoder(nn.Module):
         else:
             # get state as input and predict reward prob
             self.state_encoder = utl.FeatureExtractor(state_dim, state_embed_dim, F.relu)
-            self.action_encoder = utl.FeatureExtractor(action_dim, action_embed_dim, F.relu)
+            if self.input_action:
+                self.action_encoder = utl.FeatureExtractor(action_dim, action_embed_dim, F.relu)
+            else:
+                self.action_encoder = None
             curr_input_dim = latent_dim + state_embed_dim
             if input_prev_state:
                 curr_input_dim += state_embed_dim

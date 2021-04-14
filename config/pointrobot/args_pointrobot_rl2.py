@@ -10,7 +10,7 @@ def get_args(rest_args):
     # training parameters
     parser.add_argument('--num_frames', type=int, default=5e7, help='number of frames to train')
     parser.add_argument('--max_rollouts_per_task', type=int, default=3)
-    parser.add_argument('--exp_label', default='varibad', help='label (typically name of method)')
+    parser.add_argument('--exp_label', default='rl2', help='label (typically name of method)')
     parser.add_argument('--env_name', default='SparsePointEnv-v0', help='environment to train on')
 
     # -- RL2 (things to change in VariBAD to get to RL2 setup) --
@@ -102,7 +102,7 @@ def get_args(rest_args):
                         help='how many trajectories to use for VAE update')
     parser.add_argument('--tbptt_stepsize', type=int, default=None,
                         help='stepsize for truncated backpropagation through time; None uses max (horizon of BAMDP)')
-    parser.add_argument('--vae_subsample_elbos', type=int, default=50,
+    parser.add_argument('--vae_subsample_elbos', type=int, default=None,
                         help='for how many timesteps to compute the ELBO; None uses all')
     parser.add_argument('--vae_subsample_decodes', type=int, default=None,
                         help='number of reconstruction terms to subsample; None uses all')
