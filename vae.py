@@ -276,6 +276,7 @@ class VaribadVAE:
         """
 
         num_unique_trajectory_lens = len(np.unique(trajectory_lens))
+
         assert (num_unique_trajectory_lens == 1) or (self.args.vae_subsample_elbos and self.args.vae_subsample_decodes)
         assert not self.args.decode_only_past
 
