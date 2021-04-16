@@ -21,7 +21,7 @@ from config.mujoco import \
     args_ant_goal_multitask, args_ant_goal_expert, args_ant_goal_rl2, args_ant_goal_varibad, \
     args_ant_goal_humplik, \
     args_walker_multitask, args_walker_expert, args_walker_avg, args_walker_rl2, args_walker_varibad, \
-    args_humanoid_dir_varibad, args_humanoid_dir_rl2, args_humanoid_dir_oracle
+    args_humanoid_dir_varibad, args_humanoid_dir_rl2, args_humanoid_dir_multitask
 from environments.parallel_envs import make_vec_envs
 from learner import Learner
 from metalearner import MetaLearner
@@ -112,8 +112,8 @@ def main():
         args = args_walker_rl2.get_args(rest_args)
     #
     # - HumanoidDir -
-    elif env == 'humanoid_dir_oracle':
-        args = args_humanoid_dir_oracle.get_args(rest_args)
+    elif env == 'humanoid_dir_multitask':
+        args = args_humanoid_dir_multitask.get_args(rest_args)
     elif env == 'humanoid_dir_varibad':
         args = args_humanoid_dir_varibad.get_args(rest_args)
     elif env == 'humanoid_dir_rl2':

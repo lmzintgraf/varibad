@@ -33,7 +33,7 @@ def get_args(rest_args):
     parser.add_argument('--norm_belief_for_policy', type=boolean_argument, default=True, help='normalise belief input')
     parser.add_argument('--norm_task_for_policy', type=boolean_argument, default=True, help='normalise task input')
     parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=True, help='normalise rew for RL train')
-    parser.add_argument('--norm_actions_pre_sampling', type=boolean_argument, default=True, help='normalise policy output')
+    parser.add_argument('--norm_actions_pre_sampling', type=boolean_argument, default=False, help='normalise policy output')
     parser.add_argument('--norm_actions_post_sampling', type=boolean_argument, default=False, help='normalise policy output')
 
     # network
@@ -57,7 +57,7 @@ def get_args(rest_args):
     parser.add_argument('--lr_policy', type=float, default=7e-4, help='learning rate (default: 7e-4)')
     parser.add_argument('--num_processes', type=int, default=16,
                         help='how many training CPU processes / parallel environments to use (default: 16)')
-    parser.add_argument('--policy_num_steps', type=int, default=600,
+    parser.add_argument('--policy_num_steps', type=int, default=200,
                         help='number of env steps to do (per process) before updating')
     parser.add_argument('--policy_eps', type=float, default=1e-8, help='optimizer epsilon (1e-8 for ppo, 1e-5 for a2c)')
     parser.add_argument('--policy_init_std', type=float, default=1.0, help='only used for continuous actions')
@@ -83,13 +83,13 @@ def get_args(rest_args):
                         help='how many frames to pre-collect before training begins (useful to fill VAE buffer)')
     parser.add_argument('--vae_buffer_add_thresh', type=float, default=1,
                         help='probability of adding a new trajectory to buffer')
-    parser.add_argument('--vae_batch_num_trajs', type=int, default=10,
+    parser.add_argument('--vae_batch_num_trajs', type=int, default=15,
                         help='how many trajectories to use for VAE update')
-    parser.add_argument('--tbptt_stepsize', type=int, default=50,
+    parser.add_argument('--tbptt_stepsize', type=int, default=None,
                         help='stepsize for truncated backpropagation through time; None uses max (horizon of BAMDP)')
-    parser.add_argument('--vae_subsample_elbos', type=int, default=50,
+    parser.add_argument('--vae_subsample_elbos', type=int, default=None,
                         help='for how many timesteps to compute the ELBO; None uses all')
-    parser.add_argument('--vae_subsample_decodes', type=int, default=50,
+    parser.add_argument('--vae_subsample_decodes', type=int, default=None,
                         help='number of reconstruction terms to subsample; None uses all')
     parser.add_argument('--vae_avg_elbo_terms', type=boolean_argument, default=False,
                         help='Average ELBO terms (instead of sum)')
@@ -118,8 +118,8 @@ def get_args(rest_args):
     parser.add_argument('--decode_reward', type=boolean_argument, default=True, help='use reward decoder')
     parser.add_argument('--normalise_rew_targets', type=boolean_argument, default=False, help='divide reward targets by largest rew seen')
     parser.add_argument('--rew_loss_coeff', type=float, default=1.0, help='weight for state loss (vs reward loss)')
-    parser.add_argument('--input_prev_state', type=boolean_argument, default=True, help='use prev state for rew pred')
-    parser.add_argument('--input_action', type=boolean_argument, default=True, help='use prev action for rew pred')
+    parser.add_argument('--input_prev_state', type=boolean_argument, default=False, help='use prev state for rew pred')
+    parser.add_argument('--input_action', type=boolean_argument, default=False, help='use prev action for rew pred')
     parser.add_argument('--reward_decoder_layers', nargs='+', type=int, default=[64, 32])
     parser.add_argument('--multihead_for_reward', type=boolean_argument, default=False,
                         help='one head per reward pred (i.e. per state)')

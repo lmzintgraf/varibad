@@ -9,7 +9,7 @@ def get_args(rest_args):
 
     parser.add_argument('--num_frames', type=int, default=2e7, help='number of frames to train')
     parser.add_argument('--max_rollouts_per_task', type=int, default=1)
-    parser.add_argument('--exp_label', default='oracle', help='label for the experiment')
+    parser.add_argument('--exp_label', default='multitask', help='label for the experiment')
     parser.add_argument('--env_name', default='HumanoidDir-v0', help='environment to train on')
 
     parser.add_argument('--disable_metalearner', type=boolean_argument, default=True,
