@@ -38,7 +38,7 @@ def get_args(rest_args):
     parser.add_argument('--norm_task_for_policy', type=boolean_argument, default=False, help='normalise task input')
     parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=True, help='normalise rew for RL train')
     parser.add_argument('--norm_actions_pre_sampling', type=boolean_argument, default=False, help='normalise policy output')
-    parser.add_argument('--norm_actions_post_sampling', type=boolean_argument, default=False, help='normalise policy output')
+    parser.add_argument('--norm_actions_post_sampling', type=boolean_argument, default=True, help='normalise policy output')
 
     # network
     parser.add_argument('--policy_layers', nargs='+', default=[128, 128])
@@ -58,16 +58,16 @@ def get_args(rest_args):
     parser.add_argument('--ppo_clip_param', type=float, default=0.1, help='clamp param')
 
     # other hyperparameters
-    parser.add_argument('--lr_policy', type=float, default=1e-3, help='learning rate (default: 7e-4)')
+    parser.add_argument('--lr_policy', type=float, default=0.0007, help='learning rate (default: 7e-4)')
     parser.add_argument('--num_processes', type=int, default=16,
                         help='how many training CPU processes / parallel environments to use (default: 16)')
-    parser.add_argument('--policy_num_steps', type=int, default=200,
+    parser.add_argument('--policy_num_steps', type=int, default=400,
                         help='number of env steps to do (per process) before updating')
     parser.add_argument('--policy_eps', type=float, default=1e-8, help='optimizer epsilon (1e-8 for ppo, 1e-5 for a2c)')
     parser.add_argument('--policy_init_std', type=float, default=1.0, help='only used for continuous actions')
     parser.add_argument('--policy_value_loss_coef', type=float, default=0.5, help='value loss coefficient')
-    parser.add_argument('--policy_entropy_coef', type=float, default=0.01, help='entropy term coefficient')
-    parser.add_argument('--policy_gamma', type=float, default=0.97, help='discount factor for rewards')
+    parser.add_argument('--policy_entropy_coef', type=float, default=0.0001, help='entropy term coefficient')
+    parser.add_argument('--policy_gamma', type=float, default=0.99, help='discount factor for rewards')
     parser.add_argument('--policy_use_gae', type=boolean_argument, default=True,
                         help='use generalized advantage estimation')
     parser.add_argument('--policy_tau', type=float, default=0.9, help='gae parameter')
