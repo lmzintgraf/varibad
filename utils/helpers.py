@@ -54,8 +54,8 @@ def reset_env(env, args, indices=None, state=None):
         for i in indices:
             state[i] = env.reset(index=i)
 
-    belief = torch.from_numpy(env.get_belief()).to(device) if args.pass_belief_to_policy else None
-    task = torch.from_numpy(env.get_task()).to(device) if args.pass_task_to_policy else None
+    belief = torch.from_numpy(env.get_belief()).float().to(device) if args.pass_belief_to_policy else None
+    task = torch.from_numpy(env.get_task()).float().to(device) if args.pass_task_to_policy else None
         
     return state, belief, task
 
@@ -81,7 +81,7 @@ def env_step(env, action, args):
         reward = reward.to(device)
 
     belief = torch.from_numpy(env.get_belief()).float().to(device) if args.pass_belief_to_policy else None
-    task = torch.from_numpy(env.get_task()).to(device) if (args.pass_task_to_policy or args.decode_task) else None
+    task = torch.from_numpy(env.get_task()).float().to(device) if (args.pass_task_to_policy or args.decode_task) else None
 
     return [next_obs, belief, task], reward, done, infos
 
