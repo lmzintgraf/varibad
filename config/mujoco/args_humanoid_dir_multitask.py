@@ -39,7 +39,7 @@ def get_args(rest_args):
     parser.add_argument('--norm_actions_post_sampling', type=boolean_argument, default=True, help='normalise policy output')
 
     # network
-    parser.add_argument('--policy_layers', nargs='+', default=[128, 128])
+    parser.add_argument('--policy_layers', nargs='+', default=[512, 256])
     parser.add_argument('--policy_activation_function', type=str, default='tanh', help='tanh/relu/leaky-relu')
     parser.add_argument('--policy_initialisation', type=str, default='orthogonal', help='normc/orthogonal')
     parser.add_argument('--policy_anneal_lr', type=boolean_argument, default=True)
