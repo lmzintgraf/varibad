@@ -29,7 +29,7 @@ from metalearner import MetaLearner
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env-type', default='pointrobot_humplik')
+    parser.add_argument('--env-type', default='gridworld_varibad')
     args, rest_args = parser.parse_known_args()
     env = args.env_type
 
@@ -44,7 +44,7 @@ def main():
 
     # --- PointRobot 2D Navigation ---
 
-    if env == 'pointrobot_multitask':
+    elif env == 'pointrobot_multitask':
         args = args_pointrobot_multitask.get_args(rest_args)
     elif env == 'pointrobot_varibad':
         args = args_pointrobot_varibad.get_args(rest_args)

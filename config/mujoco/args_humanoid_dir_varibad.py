@@ -8,7 +8,7 @@ def get_args(rest_args):
     # --- GENERAL ---
 
     parser.add_argument('--num_frames', type=int, default=1e8, help='number of frames to train')
-    parser.add_argument('--max_rollouts_per_task', type=int, default=1, help='number of MDP episodes for adaptation')
+    parser.add_argument('--max_rollouts_per_task', type=int, default=2, help='number of MDP episodes for adaptation')
     parser.add_argument('--exp_label', default='varibad', help='label (typically name of method)')
     parser.add_argument('--env_name', default='HumanoidDir-v0', help='environment to train on')
 
@@ -21,8 +21,8 @@ def get_args(rest_args):
     parser.add_argument('--pass_task_to_policy', type=boolean_argument, default=False, help='condition policy on ground-truth task description')
 
     # using separate encoders for the different inputs ("None" uses no encoder)
-    parser.add_argument('--policy_state_embedding_dim', type=int, default=64)
-    parser.add_argument('--policy_latent_embedding_dim', type=int, default=64)
+    parser.add_argument('--policy_state_embedding_dim', type=int, default=None)
+    parser.add_argument('--policy_latent_embedding_dim', type=int, default=None)
     parser.add_argument('--policy_belief_embedding_dim', type=int, default=None)
     parser.add_argument('--policy_task_embedding_dim', type=int, default=None)
 
