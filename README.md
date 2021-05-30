@@ -14,7 +14,7 @@ Yarin Gal, Katja Hofmann, Shimon Whiteson, published at ICLR 2020.
 
 > ! Important !
 > 
-> If you use this code for your own environments, 
+> If you use this code with your own environments, 
 > make sure to not use `np.random` in them 
 > (e.g. to generate the tasks) because it is not thread safe 
 > (and not using it may cause duplicates across threads).
