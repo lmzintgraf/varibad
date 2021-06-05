@@ -239,33 +239,11 @@ class VaribadVAE:
 
         # returns, for each ELBO_t term, one KL (so H+1 kl's)
         if elbo_indices is not None:
-            return kl_divergences[elbo_indices]
-        else:
-            return kl_divergences
+            batchsize = kl_divergences.shape[-1]
+            task_indices = torch.arange(batchsize).repeat(self.args.vae_subsample_elbos)
+            kl_divergences = kl_divergences[elbo_indices, task_indices].reshape((self.args.vae_subsample_elbos, batchsize))
 
-    def sum_reconstruction_terms(self, losses, idx_traj, len_encoder, trajectory_lens):
-
-        """ Sums the reconstruction errors along episode horizon """
-        if len(np.unique(trajectory_lens)) == 1 and not self.args.decode_only_past:
-            # if for each embedding we decode the entire trajectory, we have a matrix and can sum along dim 1
-            losses = losses.sum(dim=1)
-        else:
-            # otherwise, we loop and sum along the trajectory which we decoded (sum in ELBO_t)
-            start_idx = 0
-            partial_reconstruction_loss = []
-            for i, idx_timestep in enumerate(len_encoder[idx_traj]):
-                if self.args.decode_only_past:
-                    dec_from = 0
-                    dec_until = idx_timestep
-                else:
-                    dec_from = 0
-                    dec_until = trajectory_lens[idx_traj]
-                end_idx = start_idx + (dec_until - dec_from)
-                if end_idx - start_idx != 0:
-                    partial_reconstruction_loss.append(losses[start_idx:end_idx].sum())
-                start_idx = end_idx
-            losses = torch.stack(partial_reconstruction_loss)
-        return losses
+        return kl_divergences
 
     def compute_loss(self, latent_mean, latent_logvar, vae_prev_obs, vae_next_obs, vae_actions,
                      vae_rewards, vae_tasks, trajectory_lens):
