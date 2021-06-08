@@ -9,6 +9,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class StateTransitionDecoder(nn.Module):
     def __init__(self,
+                 args,
                  layers,
                  latent_dim,
                  action_dim,
@@ -18,6 +19,8 @@ class StateTransitionDecoder(nn.Module):
                  pred_type='deterministic'
                  ):
         super(StateTransitionDecoder, self).__init__()
+
+        self.args = args
 
         self.state_encoder = utl.FeatureExtractor(state_dim, state_embed_dim, F.relu)
         self.action_encoder = utl.FeatureExtractor(action_dim, action_embed_dim, F.relu)
@@ -34,9 +37,12 @@ class StateTransitionDecoder(nn.Module):
         else:
             self.fc_out = nn.Linear(curr_input_dim, state_dim)
 
-    def forward(self, latent_state, state, action):
+    def forward(self, latent_state, state, actions):
 
-        ha = self.action_encoder(action)
+        # we do the action-normalisation (the the env bounds) here
+        actions = utl.squash_action(actions, self.args)
+
+        ha = self.action_encoder(actions)
         hs = self.state_encoder(state)
         h = torch.cat((latent_state, hs, ha), dim=-1)
 
@@ -48,6 +54,7 @@ class StateTransitionDecoder(nn.Module):
 
 class RewardDecoder(nn.Module):
     def __init__(self,
+                 args,
                  layers,
                  latent_dim,
                  action_dim,
@@ -61,6 +68,8 @@ class RewardDecoder(nn.Module):
                  input_action=True,
                  ):
         super(RewardDecoder, self).__init__()
+
+        self.args = args
 
         self.pred_type = pred_type
         self.multi_head = multi_head
@@ -78,7 +87,10 @@ class RewardDecoder(nn.Module):
         else:
             # get state as input and predict reward prob
             self.state_encoder = utl.FeatureExtractor(state_dim, state_embed_dim, F.relu)
-            self.action_encoder = utl.FeatureExtractor(action_dim, action_embed_dim, F.relu)
+            if self.input_action:
+                self.action_encoder = utl.FeatureExtractor(action_dim, action_embed_dim, F.relu)
+            else:
+                self.action_encoder = None
             curr_input_dim = latent_dim + state_embed_dim
             if input_prev_state:
                 curr_input_dim += state_embed_dim
@@ -94,7 +106,11 @@ class RewardDecoder(nn.Module):
             else:
                 self.fc_out = nn.Linear(curr_input_dim, 1)
 
-    def forward(self, latent_state, next_state, prev_state=None, action=None):
+    def forward(self, latent_state, next_state, prev_state=None, actions=None):
+
+        # we do the action-normalisation (the the env bounds) here
+        if actions is not None:
+            actions = utl.squash_action(actions, self.args)
 
         if self.multi_head:
             h = latent_state.clone()
@@ -102,7 +118,7 @@ class RewardDecoder(nn.Module):
             hns = self.state_encoder(next_state)
             h = torch.cat((latent_state, hns), dim=-1)
             if self.input_action:
-                ha = self.action_encoder(action)
+                ha = self.action_encoder(actions)
                 h = torch.cat((h, ha), dim=-1)
             if self.input_prev_state:
                 hps = self.state_encoder(prev_state)

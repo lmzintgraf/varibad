@@ -76,6 +76,10 @@ class PPO:
         # update the normalisation parameters of policy inputs before updating
         self.actor_critic.update_rms(args=self.args, policy_storage=policy_storage)
 
+        # call this to make sure that the action_log_probs are computed
+        # (needs to be done right here because of some caching thing when normalising actions)
+        policy_storage.before_update(self.actor_critic)
+
         value_loss_epoch = 0
         action_loss_epoch = 0
         dist_entropy_epoch = 0
@@ -102,11 +106,10 @@ class PPO:
                                                          )
 
                 # Reshape to do in a single forward pass for all steps
-                values, action_log_probs, dist_entropy, action_mean, action_logstd = \
+                values, action_log_probs, dist_entropy = \
                     self.actor_critic.evaluate_actions(state=state_batch, latent=latent_batch,
                                                        belief=belief_batch, task=task_batch,
-                                                       action=actions_batch, return_action_mean=True
-                                                       )
+                                                       action=actions_batch)
 
                 ratio = torch.exp(action_log_probs -
                                   old_action_log_probs_batch)
@@ -145,9 +148,12 @@ class PPO:
 
                 # compute gradients (will attach to all networks involved in this computation)
                 loss.backward()
+
+                # clip gradients
                 nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.args.policy_max_grad_norm)
-                if (encoder is not None) and rlloss_through_encoder:
-                    nn.utils.clip_grad_norm_(encoder.parameters(), self.args.policy_max_grad_norm)
+                if rlloss_through_encoder:
+                    if self.args.encoder_max_grad_norm is not None:
+                        nn.utils.clip_grad_norm_(encoder.parameters(), self.args.encoder_max_grad_norm)
 
                 # update
                 self.optimiser.step()

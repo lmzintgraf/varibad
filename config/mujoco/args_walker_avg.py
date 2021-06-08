@@ -8,7 +8,7 @@ def get_args(rest_args):
     # --- GENERAL ---
 
     parser.add_argument('--num_frames', type=int, default=1e8, help='number of frames to train')
-    parser.add_argument('--max_rollouts_per_task', type=int, default=2)
+    parser.add_argument('--max_rollouts_per_task', type=int, default=1)
     parser.add_argument('--exp_label', default='avg', help='label for the experiment')
     parser.add_argument('--env_name', default='Walker2DRandParams-v0', help='environment to train on')
 
@@ -35,7 +35,8 @@ def get_args(rest_args):
     parser.add_argument('--norm_belief_for_policy', type=boolean_argument, default=True, help='normalise belief input')
     parser.add_argument('--norm_task_for_policy', type=boolean_argument, default=False, help='normalise task input')
     parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=True, help='normalise rew for RL train')
-    parser.add_argument('--norm_actions_of_policy', type=boolean_argument, default=False, help='normalise policy output')
+    parser.add_argument('--norm_actions_pre_sampling', type=boolean_argument, default=False, help='normalise policy output')
+    parser.add_argument('--norm_actions_post_sampling', type=boolean_argument, default=False, help='normalise policy output')
 
     # network
     parser.add_argument('--policy_layers', nargs='+', default=[128, 128])
@@ -55,7 +56,7 @@ def get_args(rest_args):
     parser.add_argument('--ppo_clip_param', type=float, default=0.1, help='clamp param')
 
     # other hyperparameters
-    parser.add_argument('--lr_policy', type=float, default=1e-3, help='learning rate (default: 7e-4)')
+    parser.add_argument('--lr_policy', type=float, default=7e-4, help='learning rate (default: 7e-4)')
     parser.add_argument('--num_processes', type=int, default=16,
                         help='how many training CPU processes / parallel environments to use (default: 16)')
     parser.add_argument('--policy_num_steps', type=int, default=200,
@@ -71,6 +72,8 @@ def get_args(rest_args):
     parser.add_argument('--use_proper_time_limits', type=boolean_argument, default=True,
                         help='treat timeout and death differently (important in mujoco)')
     parser.add_argument('--policy_max_grad_norm', type=float, default=0.5, help='max norm of gradients')
+    parser.add_argument('--single_task_mode', type=boolean_argument, default=False,
+                        help='train policy on one (randomly chosen) environment only')
 
     # --- OTHERS ---
 

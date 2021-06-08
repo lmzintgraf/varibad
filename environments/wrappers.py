@@ -22,7 +22,8 @@ def mujoco_wrapper(entry_point, **kwargs):
 class VariBadWrapper(gym.Wrapper):
     def __init__(self,
                  env,
-                 episodes_per_task
+                 episodes_per_task,
+                 add_done_info=None,  # force to turn this on/off
                  ):
         """
         Wrapper, creates a multi-episode (BA)MDP around a one-episode MDP. Automatically deals with
@@ -43,10 +44,13 @@ class VariBadWrapper(gym.Wrapper):
         if not hasattr(self.env.unwrapped, 'num_states'):
             self.env.unwrapped.num_states = None
 
-        if episodes_per_task > 1:
-            self.add_done_info = True
+        if add_done_info is None:
+            if episodes_per_task > 1:
+                self.add_done_info = True
+            else:
+                self.add_done_info = False
         else:
-            self.add_done_info = False
+            self.add_done_info = add_done_info
 
         if self.add_done_info:
             if isinstance(self.observation_space, spaces.Box) or isinstance(self.observation_space,

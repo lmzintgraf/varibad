@@ -12,6 +12,16 @@ Yarin Gal, Katja Hofmann, Shimon Whiteson, published at ICLR 2020.
   year={2020}}
 ```
 
+> ! Important !
+> 
+> If you use this code with your own environments, 
+> make sure to not use `np.random` in them 
+> (e.g. to generate the tasks) because it is not thread safe 
+> (and not using it may cause duplicates across threads).
+> Instead, use the python native random function. 
+> For an example see
+> [here](https://github.com/lmzintgraf/varibad/blob/master/environments/mujoco/ant_goal.py#L38).
+
 ### Requirements
 
 We use PyTorch for this code, and log results using TensorboardX.
@@ -85,7 +95,6 @@ Another important parameter is the weight of the kl term (`--kl_weight`) in the 
 - When the flag `disable_metalearner` is activated, the file `learner.py` will be used instead of `metalearner.py`. 
 This is a stripped down version without encoder, decoder, stochastic latent variables, etc. 
 It can be used to train (belief) oracles or policies that are good on average.
-- For the environments do not use `np.random` (it's not thread safe) but stick to `random` or `torch.random`.
 - Currently, the VAE never looks at the starting state, but the prior is independent
 of where the agent starts. It was easier to implement like this. 
 Since actions/rewards aren't available at the first time step, 

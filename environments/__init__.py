@@ -45,6 +45,14 @@ register(
     max_episode_steps=200
 )
 
+register(
+    'HumanoidDir-v0',
+    entry_point='environments.wrappers:mujoco_wrapper',
+    kwargs={'entry_point': 'environments.mujoco.humanoid_dir:HumanoidDirEnv',
+            'max_episode_steps': 200},
+    max_episode_steps=200
+)
+
 # - randomised dynamics
 
 register(
@@ -66,14 +74,20 @@ register(
 register(
     'PointEnv-v0',
     entry_point='environments.navigation.point_robot:PointEnv',
-    kwargs={'max_episode_steps': 100},
+    kwargs={'goal_radius': 0.2,
+            'max_episode_steps': 100,
+            'goal_sampler': 'semi-circle'
+            },
     max_episode_steps=100,
 )
 
 register(
     'SparsePointEnv-v0',
     entry_point='environments.navigation.point_robot:SparsePointEnv',
-    kwargs={'max_episode_steps': 100},
+    kwargs={'goal_radius': 0.2,
+            'max_episode_steps': 100,
+            'goal_sampler': 'semi-circle'
+            },
     max_episode_steps=100,
 )
 

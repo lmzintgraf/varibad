@@ -8,7 +8,7 @@ def get_args(rest_args):
     # --- GENERAL ---
 
     parser.add_argument('--num_frames', type=int, default=1e8, help='number of frames to train')
-    parser.add_argument('--max_rollouts_per_task', type=int, default=1, help='number of MDP episodes for adaptation')
+    parser.add_argument('--max_rollouts_per_task', type=int, default=2, help='number of MDP episodes for adaptation')
     parser.add_argument('--exp_label', default='rl2', help='label (typically name of method)')
     parser.add_argument('--env_name', default='HalfCheetahDir-v0', help='environment to train on')
 
@@ -16,6 +16,8 @@ def get_args(rest_args):
 
     parser.add_argument('--disable_decoder', type=boolean_argument, default=True,
                         help='train without decoder')
+    parser.add_argument('--disable_kl_term', type=boolean_argument, default=True,
+                        help='dont use the KL regularising loss term')
     parser.add_argument('--add_nonlinearity_to_latent', type=boolean_argument, default=True,
                         help='Use relu before feeding latent to policy')
     parser.add_argument('--rlloss_through_encoder', type=boolean_argument, default=True,
@@ -44,7 +46,8 @@ def get_args(rest_args):
     parser.add_argument('--norm_belief_for_policy', type=boolean_argument, default=False, help='normalise belief input')
     parser.add_argument('--norm_task_for_policy', type=boolean_argument, default=False, help='normalise task input')
     parser.add_argument('--norm_rew_for_policy', type=boolean_argument, default=True, help='normalise rew for RL train')
-    parser.add_argument('--norm_actions_of_policy', type=boolean_argument, default=False, help='normalise policy output')
+    parser.add_argument('--norm_actions_pre_sampling', type=boolean_argument, default=False, help='normalise policy output')
+    parser.add_argument('--norm_actions_post_sampling', type=boolean_argument, default=False, help='normalise policy output')
 
     # network
     parser.add_argument('--policy_layers', nargs='+', default=[128])
@@ -82,6 +85,8 @@ def get_args(rest_args):
     parser.add_argument('--use_proper_time_limits', type=boolean_argument, default=True,
                         help='treat timeout and death differently (important in mujoco)')
     parser.add_argument('--policy_max_grad_norm', type=float, default=0.5, help='max norm of gradients')
+    parser.add_argument('--encoder_max_grad_norm', type=float, default=0.5, help='max norm of gradients')
+    parser.add_argument('--decoder_max_grad_norm', type=float, default=None, help='max norm of gradients')
 
     # --- VAE TRAINING ---
 
@@ -146,18 +151,19 @@ def get_args(rest_args):
 
     # --- ABLATIONS ---
 
-    parser.add_argument('--disable_metalearner', type=boolean_argument, default=False,
-                        help='Train feedforward policy')
-    parser.add_argument('--disable_stochasticity_in_latent', type=boolean_argument, default=False,
-                        help='use auto-encoder (non-variational)')
+    # for the policy training
     parser.add_argument('--sample_embeddings', type=boolean_argument, default=False,
                         help='sample embedding for policy, instead of full belief')
+
+    # combining vae and RL loss
     parser.add_argument('--vae_loss_coeff', type=float, default=1.0,
                         help='weight for VAE loss (vs RL loss)')
-    parser.add_argument('--kl_to_gauss_prior', type=boolean_argument, default=False,
-                        help='KL term in ELBO to fixed Gaussian prior (instead of prev approx posterior)')
-    parser.add_argument('--decode_only_past', type=boolean_argument, default=False,
-                        help='only decoder past observations, not the future')
+
+    # for other things
+    parser.add_argument('--disable_metalearner', type=boolean_argument, default=False,
+                        help='Train feedforward policy')
+    parser.add_argument('--single_task_mode', type=boolean_argument, default=False,
+                        help='train policy on one (randomly chosen) environment only')
 
     # --- OTHERS ---
 

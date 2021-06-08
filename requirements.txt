@@ -3,7 +3,6 @@ torch==1.5.1
 torchvision==0.6.1
 gym==0.17.2
 seaborn
-tensorboard
 
 # only for the mujoco environments
 mujoco-py==2.0.2.10

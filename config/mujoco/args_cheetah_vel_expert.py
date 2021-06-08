@@ -9,11 +9,13 @@ def get_args(rest_args):
 
     parser.add_argument('--num_frames', type=int, default=1e8, help='number of frames to train')
     parser.add_argument('--max_rollouts_per_task', type=int, default=1)
-    parser.add_argument('--exp_label', default='avg', help='label for the experiment')
+    parser.add_argument('--exp_label', default='expert', help='label for the experiment')
     parser.add_argument('--env_name', default='HalfCheetahVel-v0', help='environment to train on')
 
     parser.add_argument('--disable_metalearner', type=boolean_argument, default=True,
                         help='Train a normal policy without the variBAD architecture')
+    parser.add_argument('--single_task_mode', type=boolean_argument, default=True,
+                        help='train policy on one (randomly chosen) environment only')
 
     # --- POLICY ---
 
@@ -72,8 +74,6 @@ def get_args(rest_args):
     parser.add_argument('--use_proper_time_limits', type=boolean_argument, default=True,
                         help='treat timeout and death differently (important in mujoco)')
     parser.add_argument('--policy_max_grad_norm', type=float, default=0.5, help='max norm of gradients')
-    parser.add_argument('--single_task_mode', type=boolean_argument, default=False,
-                        help='train policy on one (randomly chosen) environment only')
 
     # --- OTHERS ---
 

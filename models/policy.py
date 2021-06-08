@@ -6,6 +6,24 @@ import torch
 import torch.nn as nn
 
 from utils import helpers as utl
+try:
+    from torch.distributions import TanhTransform, TransformedDistribution
+
+    class TanhNormal(TransformedDistribution):
+        def __init__(self, base_distribution, transforms, validate_args=None):
+            super().__init__(base_distribution, transforms, validate_args=None)
+
+    @property
+    def mean(self):
+        x = self.base_dist.mean
+        for transform in self.transforms:
+            x = transform(x)
+        return x
+
+except ImportError:
+    print('You are probably running MuJoCo 131, so PyTorch Transforms cannot be used. '
+          'Do not set norm_actions_pre_sampling, this will break.')
+    pass
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -29,9 +47,6 @@ class Policy(nn.Module):
                  # output
                  action_space,
                  init_std,
-                 norm_actions_of_policy,
-                 action_low,
-                 action_high,
                  ):
         """
         The policy can get any of these as input:
@@ -70,10 +85,10 @@ class Policy(nn.Module):
         self.norm_latent = self.args.norm_latent_for_policy and (dim_latent is not None)
         if self.pass_latent_to_policy and self.norm_latent:
             self.latent_rms = utl.RunningMeanStd(shape=(dim_latent))
-        self.norm_belief = self.args.norm_belief_for_policy and (dim_task is not None)
+        self.norm_belief = self.args.norm_belief_for_policy and (dim_belief is not None)
         if self.pass_belief_to_policy and self.norm_belief:
             self.belief_rms = utl.RunningMeanStd(shape=(dim_belief))
-        self.norm_task = self.args.norm_task_for_policy and (dim_belief is not None)
+        self.norm_task = self.args.norm_task_for_policy and (dim_task is not None)
         if self.pass_task_to_policy and self.norm_task:
             self.task_rms = utl.RunningMeanStd(shape=(dim_task))
 
@@ -117,9 +132,7 @@ class Policy(nn.Module):
             self.dist = Categorical(hidden_layers[-1], num_outputs)
         elif action_space.__class__.__name__ == "Box":
             num_outputs = action_space.shape[0]
-            self.dist = DiagGaussian(hidden_layers[-1], num_outputs, init_std, min_std=1e-6,
-                                     action_low=action_low, action_high=action_high,
-                                     norm_actions_of_policy=norm_actions_of_policy)
+            self.dist = DiagGaussian(hidden_layers[-1], num_outputs, init_std, self.args.norm_actions_pre_sampling)
         else:
             raise NotImplementedError
 
@@ -148,7 +161,6 @@ class Policy(nn.Module):
         # handle inputs (normalise + embed)
 
         if self.pass_state_to_policy:
-            # TODO: somehow don't normalise the "done" flag (if existing)
             if self.norm_state:
                 state = (state - self.state_rms.mean) / torch.sqrt(self.state_rms.var + 1e-8)
             if self.use_state_encoder:
@@ -160,18 +172,13 @@ class Policy(nn.Module):
                 latent = (latent - self.latent_rms.mean) / torch.sqrt(self.latent_rms.var + 1e-8)
             if self.use_latent_encoder:
                 latent = self.latent_encoder(latent)
-            if len(latent.shape) == 1 and len(state.shape) == 2:
-                latent = latent.unsqueeze(0)
         else:
             latent = torch.zeros(0, ).to(device)
         if self.pass_belief_to_policy:
             if self.norm_belief:
                 belief = (belief - self.belief_rms.mean) / torch.sqrt(self.belief_rms.var + 1e-8)
             if self.use_belief_encoder:
-                belief = self.belief_encoder(belief)
-            belief = belief.float()
-            if len(belief.shape) == 1 and len(state.shape) == 2:
-                belief = belief.unsqueeze(0)
+                belief = self.belief_encoder(belief.float())
         else:
             belief = torch.zeros(0, ).to(device)
         if self.pass_task_to_policy:
@@ -179,8 +186,6 @@ class Policy(nn.Module):
                 task = (task - self.task_rms.mean) / torch.sqrt(self.task_rms.var + 1e-8)
             if self.use_task_encoder:
                 task = self.task_encoder(task.float())
-            if len(task.shape) == 1 and len(state.shape) == 2:
-                task = task.unsqueeze(0)
         else:
             task = torch.zeros(0, ).to(device)
 
@@ -193,15 +198,20 @@ class Policy(nn.Module):
         return self.critic_linear(hidden_critic), hidden_actor
 
     def act(self, state, latent, belief, task, deterministic=False):
+        """
+        Returns the (raw) actions and their value.
+        """
         value, actor_features = self.forward(state=state, latent=latent, belief=belief, task=task)
         dist = self.dist(actor_features)
         if deterministic:
-            action = dist.mode()
+            if isinstance(dist, FixedCategorical):
+                action = dist.mode()
+            else:
+                action = dist.mean
         else:
             action = dist.sample()
-        action_log_probs = dist.log_probs(action)
 
-        return value, action, action_log_probs
+        return value, action
 
     def get_value(self, state, latent, belief, task):
         value, _ = self.forward(state, latent, belief, task)
@@ -210,8 +220,7 @@ class Policy(nn.Module):
     def update_rms(self, args, policy_storage):
         """ Update normalisation parameters for inputs with current data """
         if self.pass_state_to_policy and self.norm_state:
-            state = policy_storage.prev_state[:-1]
-            self.state_rms.update(state)
+            self.state_rms.update(policy_storage.prev_state[:-1])
         if self.pass_latent_to_policy and self.norm_latent:
             latent = utl.get_latent_for_policy(args,
                                                torch.cat(policy_storage.latent_samples[:-1]),
@@ -224,18 +233,25 @@ class Policy(nn.Module):
         if self.pass_task_to_policy and self.norm_task:
             self.task_rms.update(policy_storage.tasks[:-1])
 
-    def evaluate_actions(self, state, latent, belief, task, action, return_action_mean=False):
+    def evaluate_actions(self, state, latent, belief, task, action):
 
         value, actor_features = self.forward(state, latent, belief, task)
         dist = self.dist(actor_features)
 
-        action_log_probs = dist.log_probs(action)
-        dist_entropy = dist.entropy().mean()
-
-        if not return_action_mean:
-            return value, action_log_probs, dist_entropy
+        if self.args.norm_actions_post_sampling:
+            transformation = TanhTransform(cache_size=1)
+            dist = TanhNormal(dist, transformation)
+            action = transformation(action)
+            action_log_probs = dist.log_prob(action).sum(-1, keepdim=True)
+            # empirical entropy
+            # dist_entropy = -action_log_probs.mean()
+            # entropy of underlying dist (isn't correct but works well in practice)
+            dist_entropy = dist.base_dist.entropy().mean()
         else:
-            return value, action_log_probs, dist_entropy, dist.mode(), dist.stddev
+            action_log_probs = dist.log_probs(action)
+            dist_entropy = dist.entropy().mean()
+
+        return value, action_log_probs, dist_entropy
 
 
 FixedCategorical = torch.distributions.Categorical
@@ -287,8 +303,7 @@ class Categorical(nn.Module):
 
 
 class DiagGaussian(nn.Module):
-    def __init__(self, num_inputs, num_outputs, init_std, min_std,
-                 action_low, action_high, norm_actions_of_policy):
+    def __init__(self, num_inputs, num_outputs, init_std, norm_actions_pre_sampling):
         super(DiagGaussian, self).__init__()
 
         init_ = lambda m: init(m,
@@ -297,31 +312,18 @@ class DiagGaussian(nn.Module):
 
         self.fc_mean = init_(nn.Linear(num_inputs, num_outputs))
         self.logstd = nn.Parameter(np.log(torch.zeros(num_outputs) + init_std))
-        self.min_std = torch.tensor([min_std]).to(device)
-
-        # whether or not to conform to the action space given by the env
-        # (scale / squash actions that the network outpus)
-        self.norm_actions_of_policy = norm_actions_of_policy
-        if len(np.unique(action_low)) == 1 and len(np.unique(action_high)) == 1:
-            self.unique_action_limits = True
-        else:
-            self.unique_action_limits = False
-
-        self.action_low = torch.from_numpy(action_low).to(device)
-        self.action_high = torch.from_numpy(action_high).to(device)
+        self.norm_actions_pre_sampling = norm_actions_pre_sampling
+        self.min_std = torch.tensor([1e-6]).to(device)
 
     def forward(self, x):
+
         action_mean = self.fc_mean(x)
-        if self.norm_actions_of_policy:
-            if self.unique_action_limits and \
-                    torch.unique(self.action_low) == -1 and \
-                    torch.unique(self.action_high) == 1:
-                action_mean = torch.tanh(action_mean)
-            else:
-                # TODO: this isn't tested
-                action_mean = torch.sigmoid(action_mean) * (self.action_high - self.action_low) + self.action_low
+        if self.norm_actions_pre_sampling:
+            action_mean = torch.tanh(action_mean)
         std = torch.max(self.min_std, self.logstd.exp())
-        return FixedNormal(action_mean, std)
+        dist = FixedNormal(action_mean, std)
+
+        return dist
 
 
 class AddBias(nn.Module):

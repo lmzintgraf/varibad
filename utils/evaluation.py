@@ -12,6 +12,7 @@ def evaluate(args,
              policy,
              ret_rms,
              iter_idx,
+             tasks,
              encoder=None,
              num_episodes=None
              ):
@@ -32,12 +33,18 @@ def evaluate(args,
 
     # --- initialise environments and latents ---
 
-    envs = make_vec_envs(env_name, seed=args.seed * 42 + iter_idx, num_processes=num_processes,
+    envs = make_vec_envs(env_name,
+                         seed=args.seed * 42 + iter_idx,
+                         num_processes=num_processes,
                          gamma=args.policy_gamma,
                          device=device,
                          rank_offset=num_processes + 1,  # to use diff tmp folders than main processes
                          episodes_per_task=num_episodes,
-                         normalise_rew=args.norm_rew_for_policy, ret_rms=ret_rms)
+                         normalise_rew=args.norm_rew_for_policy,
+                         ret_rms=ret_rms,
+                         tasks=tasks,
+                         add_done_info=args.max_rollouts_per_task > 1,
+                         )
     num_steps = envs._max_episode_steps
 
     # reset environments
@@ -57,15 +64,15 @@ def evaluate(args,
         for step_idx in range(num_steps):
 
             with torch.no_grad():
-                _, action, _ = utl.select_action(args=args,
-                                                 policy=policy,
-                                                 state=state,
-                                                 belief=belief,
-                                                 task=task,
-                                                 latent_sample=latent_sample,
-                                                 latent_mean=latent_mean,
-                                                 latent_logvar=latent_logvar,
-                                                 deterministic=True)
+                _, action = utl.select_action(args=args,
+                                              policy=policy,
+                                              state=state,
+                                              belief=belief,
+                                              task=task,
+                                              latent_sample=latent_sample,
+                                              latent_mean=latent_mean,
+                                              latent_logvar=latent_logvar,
+                                              deterministic=True)
 
             # observe reward and next obs
             [state, belief, task], (rew_raw, rew_normalised), done, infos = utl.env_step(envs, action, args)
@@ -100,6 +107,7 @@ def visualise_behaviour(args,
                         image_folder,
                         iter_idx,
                         ret_rms,
+                        tasks,
                         encoder=None,
                         reward_decoder=None,
                         state_decoder=None,
@@ -118,6 +126,7 @@ def visualise_behaviour(args,
                         episodes_per_task=args.max_rollouts_per_task,
                         normalise_rew=args.norm_rew_for_policy, ret_rms=ret_rms,
                         rank_offset=args.num_processes + 42,  # not sure if the temp folders would otherwise clash
+                        tasks=tasks
                         )
     episode_task = torch.from_numpy(np.array(env.get_task())).to(device).float()
 
@@ -149,7 +158,7 @@ def visualise_behaviour(args,
                      iter_idx=iter_idx
                      )
 
-        if not (args.disable_stochasticity_in_latent and args.disable_decoder):
+        if not (args.disable_decoder and args.disable_kl_term):
             plot_vae_loss(args,
                           latent_means,
                           latent_logvars,
@@ -224,7 +233,7 @@ def get_test_rollout(args, env, policy, encoder=None):
                                                latent_sample=curr_latent_sample,
                                                latent_mean=curr_latent_mean,
                                                latent_logvar=curr_latent_logvar)
-            _, action, _ = policy.act(state=state.view(-1), latent=latent, belief=belief, task=task, deterministic=True)
+            _, action = policy.act(state=state.view(-1), latent=latent, belief=belief, task=task, deterministic=True)
             action = action.reshape((1, *action.shape))
 
             # observe reward and next obs
@@ -428,6 +437,7 @@ def plot_vae_loss(args,
     x = range(len(vae_kl_term))
 
     plt.plot(x, vae_kl_term.cpu().detach().numpy(), 'b-')
+    vae_kl_term = vae_kl_term.cpu()
     for tj in np.cumsum([0, *[num_episode_steps for _ in range(num_rollouts)]]):
         span = vae_kl_term.max() - vae_kl_term.min()
         plt.plot([tj + 0.5, tj + 0.5],

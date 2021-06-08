@@ -1,6 +1,7 @@
 import itertools
 import math
 import random
+from torch.nn import functional as F
 
 import gym
 import matplotlib.pyplot as plt
@@ -81,6 +82,8 @@ class GridNavi(gym.Env):
             self._belief_state[self.task_to_id(state)] = 0
             self._belief_state = np.ceil(self._belief_state)
             self._belief_state /= sum(self._belief_state)
+
+        assert (1-sum(self._belief_state)) < 1e-4
 
         return self._belief_state
 
@@ -275,7 +278,7 @@ class GridNavi(gym.Env):
                     episode_prev_obs[episode_idx].append(state.clone())
 
                 # act
-                _, action, _ = utl.select_action(args=args,
+                _, action = utl.select_action(args=args,
                                                  policy=policy,
                                                  state=state.view(-1),
                                                  belief=belief,
@@ -512,10 +515,10 @@ def compute_beliefs(env, args, reward_decoder, latent_mean, latent_logvar, goal)
     # compute reward predictions for those
     if reward_decoder.multi_head:
         rew_pred = reward_decoder(samples, None)
-        if args.rew_pred_type == 'bernoulli':
+        if args.rew_pred_type == 'categorical':
+            rew_pred = F.softmax(rew_pred, dim=-1)
+        elif args.rew_pred_type == 'bernoulli':
             rew_pred = torch.sigmoid(rew_pred)
-        elif args.rew_pred_type == 'categorical':
-            rew_pred = torch.softmax(rew_pred, 1)
         rew_pred_means = torch.mean(rew_pred, dim=0)  # .reshape((1, -1))
         rew_pred_vars = torch.var(rew_pred, dim=0)  # .reshape((1, -1))
     else:

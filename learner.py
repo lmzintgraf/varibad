@@ -34,7 +34,7 @@ class Learner:
         # calculate number of updates and keep count of frames/iterations
         self.num_updates = int(args.num_frames) // args.policy_num_steps // args.num_processes
         self.frames = 0
-        self.iter_idx = 0
+        self.iter_idx = -1
 
         # initialise tensorboard logger
         self.logger = TBLogger(self.args, self.args.exp_label)
@@ -44,7 +44,27 @@ class Learner:
                                   gamma=args.policy_gamma, device=device,
                                   episodes_per_task=self.args.max_rollouts_per_task,
                                   normalise_rew=args.norm_rew_for_policy, ret_rms=None,
+                                  tasks=None
                                   )
+
+        if self.args.single_task_mode:
+            # get the current tasks (which will be num_process many different tasks)
+            self.train_tasks = self.envs.get_task()
+            # set the tasks to the first task (i.e. just a random task)
+            self.train_tasks[1:] = self.train_tasks[0]
+            # make it a list
+            self.train_tasks = [t for t in self.train_tasks]
+            # re-initialise environments with those tasks
+            self.envs = make_vec_envs(env_name=args.env_name, seed=args.seed, num_processes=args.num_processes,
+                                      gamma=args.policy_gamma, device=device,
+                                      episodes_per_task=self.args.max_rollouts_per_task,
+                                      normalise_rew=args.norm_rew_for_policy, ret_rms=None,
+                                      tasks=self.train_tasks,
+                                      )
+            # save the training tasks so we can evaluate on the same envs later
+            utl.save_obj(self.train_tasks, self.logger.full_output_folder, "train_tasks")
+        else:
+            self.train_tasks = None
 
         # calculate what the maximum length of the trajectories is
         args.max_trajectory_len = self.envs._max_episode_steps
@@ -81,12 +101,6 @@ class Learner:
 
     def initialise_policy(self):
 
-        if hasattr(self.envs.action_space, 'low'):
-            action_low = self.envs.action_space.low
-            action_high = self.envs.action_space.high
-        else:
-            action_low = action_high = None
-
         # initialise policy network
         policy_net = Policy(
             args=self.args,
@@ -106,9 +120,6 @@ class Learner:
             #
             action_space=self.envs.action_space,
             init_std=self.args.policy_init_std,
-            norm_actions_of_policy=self.args.norm_actions_of_policy,
-            action_low=action_low,
-            action_high=action_high,
         ).to(device)
 
         # initialise policy trainer
@@ -167,7 +178,7 @@ class Learner:
 
                 # sample actions from policy
                 with torch.no_grad():
-                    value, action, action_log_prob = utl.select_action(
+                    value, action = utl.select_action(
                         args=self.args,
                         policy=self.policy,
                         state=state,
@@ -195,7 +206,6 @@ class Learner:
                     belief=belief,
                     task=task,
                     actions=action,
-                    action_log_probs=action_log_prob,
                     rewards_raw=rew_raw,
                     rewards_normalised=rew_normalised,
                     value_preds=value,
@@ -211,7 +221,7 @@ class Learner:
             train_stats = self.update(state=state, belief=belief, task=task)
 
             # log
-            run_stats = [action, action_log_prob, value]
+            run_stats = [action, self.policy_storage.action_log_probs, value]
             if train_stats is not None:
                 with torch.no_grad():
                     self.log(run_stats, train_stats, start_time)
@@ -248,26 +258,27 @@ class Learner:
 
         # --- visualise behaviour of policy ---
 
-        if self.iter_idx % self.args.vis_interval == 0:
-
+        if (self.iter_idx + 1) % self.args.vis_interval == 0:
             ret_rms = self.envs.venv.ret_rms if self.args.norm_rew_for_policy else None
             utl_eval.visualise_behaviour(args=self.args,
                                          policy=self.policy,
                                          image_folder=self.logger.full_output_folder,
                                          iter_idx=self.iter_idx,
                                          ret_rms=ret_rms,
+                                         tasks=self.train_tasks,
                                          )
 
         # --- evaluate policy ----
 
-        if self.iter_idx % self.args.eval_interval == 0:
+        if (self.iter_idx + 1) % self.args.eval_interval == 0:
 
             ret_rms = self.envs.venv.ret_rms if self.args.norm_rew_for_policy else None
 
             returns_per_episode = utl_eval.evaluate(args=self.args,
                                                     policy=self.policy,
                                                     ret_rms=ret_rms,
-                                                    iter_idx=self.iter_idx
+                                                    iter_idx=self.iter_idx,
+                                                    tasks=self.train_tasks,
                                                     )
 
             # log the average return across tasks (=processes)
@@ -284,7 +295,7 @@ class Learner:
                          returns_avg[-1].item()))
 
         # save model
-        if self.iter_idx % self.args.save_interval == 0:
+        if (self.iter_idx + 1) % self.args.save_interval == 0:
             save_path = os.path.join(self.logger.full_output_folder, 'models')
             if not os.path.exists(save_path):
                 os.mkdir(save_path)
@@ -308,7 +319,7 @@ class Learner:
 
         # --- log some other things ---
 
-        if (self.iter_idx % self.args.log_interval == 0) and (train_stats is not None):
+        if ((self.iter_idx + 1) % self.args.log_interval == 0) and (train_stats is not None):
 
             train_stats, _ = train_stats
 
@@ -326,8 +337,9 @@ class Learner:
 
             param_list = list(self.policy.actor_critic.parameters())
             param_mean = np.mean([param_list[i].data.cpu().numpy().mean() for i in range(len(param_list))])
-            param_grad_mean = np.mean([param_list[i].grad.cpu().numpy().mean() for i in range(len(param_list))])
             self.logger.add('weights/policy', param_mean, self.iter_idx)
             self.logger.add('weights/policy_std', param_list[0].data.cpu().mean(), self.iter_idx)
-            self.logger.add('gradients/policy', param_grad_mean, self.iter_idx)
-            self.logger.add('gradients/policy_std', param_list[0].grad.cpu().numpy().mean(), self.iter_idx)
+            if param_list[0].grad is not None:
+                param_grad_mean = np.mean([param_list[i].grad.cpu().numpy().mean() for i in range(len(param_list))])
+                self.logger.add('gradients/policy', param_grad_mean, self.iter_idx)
+                self.logger.add('gradients/policy_std', param_list[0].grad.cpu().numpy().mean(), self.iter_idx)
