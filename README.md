@@ -1,6 +1,6 @@
 # VariBAD
 
-Code for the paper "[VariBAD: A very good method for Bayes-Adaptive Deep RL via Meta-Learning](https://openreview.net/forum?id=Hkl9JlBYvr)" - 
+Code for the paper "[VariBAD: A very good method for Bayes-Adaptive Deep RL via Meta-Learning](https://arxiv.org/abs/1910.08348)" - 
 Luisa Zintgraf, Kyriacos Shiarlis, Maximilian Igl, Sebastian Schulze, 
 Yarin Gal, Katja Hofmann, Shimon Whiteson, published at ICLR 2020.
 
