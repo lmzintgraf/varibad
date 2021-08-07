@@ -41,13 +41,32 @@ class PointEnv(Env):
      - reward is L2 distance
     """
 
-    def __init__(self, max_episode_steps=100, goal_sampler=None):
+    def __init__(self, max_episode_steps=100, **kwargs):
+        '''
         if callable(goal_sampler):
             self.goal_sampler = goal_sampler
         elif isinstance(goal_sampler, str):
             self.goal_sampler = GOAL_SAMPLERS[goal_sampler]
         elif goal_sampler is None:
             self.goal_sampler = semi_circle_goal_sampler
+        else:
+            raise NotImplementedError(goal_sampler)
+        '''
+        goal_sampler = kwargs['args'].goal_sampler
+        if goal_sampler == 'close':
+            self.bound = {'r_low': 0., 'r_high': 1., 'theta_low': -180, 'theta_high': 180}
+        elif goal_sampler == 'mid':
+            self.bound = {'r_low': 1., 'r_high': 1.5, 'theta_low': -180, 'theta_high': 180}
+        elif goal_sampler == 'far':
+            self.bound = {'r_low': 1.5, 'r_high': 2., 'theta_low': -180, 'theta_high': 180}
+        elif goal_sampler == 'left':
+            self.bound = {'r_low': 0., 'r_high': 1., 'theta_low': 90, 'theta_high': 270}
+        elif goal_sampler == 'right':
+            self.bound = {'r_low': 0., 'r_high': 1., 'theta_low': -90, 'theta_high': 90}
+        elif goal_sampler == 'up':
+            self.bound = {'r_low': 0., 'r_high': 1., 'theta_low': 0, 'theta_high': 180}
+        elif goal_sampler == 'bottom':
+            self.bound = {'r_low': 0., 'r_high': 1., 'theta_low': -180, 'theta_high': 0}
         else:
             raise NotImplementedError(goal_sampler)
 
@@ -59,7 +78,10 @@ class PointEnv(Env):
         self._max_episode_steps = max_episode_steps
 
     def sample_task(self):
-        goal = self.goal_sampler()
+        #goal = self.goal_sampler()
+        r = random.uniform(self.bound['r_low'], self.bound['r_high'])
+        angle = random.uniform(self.bound['theta_low'], self.bound['theta_high'])
+        goal = r * np.array((np.cos(angle), np.sin(angle)))
         return goal
 
     def set_task(self, task):
@@ -221,10 +243,10 @@ class PointEnv(Env):
         figsize = (5.5, 4)
         figure, axis = plt.subplots(1, 1, figsize=figsize)
         xlim = (-1.3, 1.3)
-        if self.goal_sampler == semi_circle_goal_sampler:
-            ylim = (-0.3, 1.3)
-        else:
-            ylim = (-1.3, 1.3)
+        #if self.goal_sampler == semi_circle_goal_sampler:
+        #    ylim = (-0.3, 1.3)
+        #else:
+        ylim = (-1.3, 1.3)
         color_map = mpl.colors.ListedColormap(sns.color_palette("husl", num_episodes))
 
         observations = torch.stack([episode_prev_obs[i]for i in range(num_episodes)]).cpu().numpy()
@@ -243,10 +265,10 @@ class PointEnv(Env):
 
             # plot (semi-)circle
             r = 1.0
-            if self.goal_sampler == semi_circle_goal_sampler:
-                angle = np.linspace(0, np.pi, 100)
-            else:
-                angle = np.linspace(0, 2*np.pi, 100)
+            #if self.goal_sampler == semi_circle_goal_sampler:
+            #    angle = np.linspace(0, np.pi, 100)
+            #else:
+            angle = np.linspace(0, 2*np.pi, 100)
             goal_range = r * np.array((np.cos(angle), np.sin(angle)))
             plt.plot(goal_range[0], goal_range[1], 'k--', alpha=0.1)
 

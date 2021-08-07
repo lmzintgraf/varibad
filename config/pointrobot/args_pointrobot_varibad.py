@@ -6,6 +6,7 @@ def get_args(rest_args):
     parser = argparse.ArgumentParser()
 
     # --- GENERAL ---
+    parser.add_argument('--goal_sampler', type=str, default='close', help='goal space used for training')
 
     # training parameters
     parser.add_argument('--num_frames', type=int, default=5e7, help='number of frames to train')

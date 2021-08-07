@@ -140,6 +140,7 @@ def main():
                              episodes_per_task=args.max_rollouts_per_task,
                              normalise_rew=args.norm_rew_for_policy, ret_rms=None,
                              tasks=None,
+                             args=args
                              )
         assert np.unique(envs.action_space.low) == [-1]
         assert np.unique(envs.action_space.high) == [1]

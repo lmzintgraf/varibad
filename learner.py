@@ -44,7 +44,8 @@ class Learner:
                                   gamma=args.policy_gamma, device=device,
                                   episodes_per_task=self.args.max_rollouts_per_task,
                                   normalise_rew=args.norm_rew_for_policy, ret_rms=None,
-                                  tasks=None
+                                  tasks=None, 
+                                  args=args
                                   )
 
         if self.args.single_task_mode:
@@ -60,6 +61,7 @@ class Learner:
                                       episodes_per_task=self.args.max_rollouts_per_task,
                                       normalise_rew=args.norm_rew_for_policy, ret_rms=None,
                                       tasks=self.train_tasks,
+                                      args=args
                                       )
             # save the training tasks so we can evaluate on the same envs later
             utl.save_obj(self.train_tasks, self.logger.full_output_folder, "train_tasks")
