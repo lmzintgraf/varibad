@@ -81,6 +81,12 @@ class MetaLearner:
             self.args.action_dim = self.envs.action_space.shape[0]
 
         # initialise VAE and policy
+        if self.args.init_model_path is not None:
+            init_model_path = os.path.join(self.args.init_model_path, os.listdir(self.args.init_model_path)[-1])
+            init_model_path = os.path.join(init_model_path, os.listdir(init_model_path)[-1])
+            init_model_path = os.path.join(init_model_path, 'models')
+            self.args.init_model_path = init_model_path
+
         self.vae = VaribadVAE(self.args, self.logger, lambda: self.iter_idx)
         self.policy_storage = self.initialise_policy_storage()
         self.policy = self.initialise_policy()
@@ -101,25 +107,28 @@ class MetaLearner:
     def initialise_policy(self):
 
         # initialise policy network
-        policy_net = Policy(
-            args=self.args,
-            #
-            pass_state_to_policy=self.args.pass_state_to_policy,
-            pass_latent_to_policy=self.args.pass_latent_to_policy,
-            pass_belief_to_policy=self.args.pass_belief_to_policy,
-            pass_task_to_policy=self.args.pass_task_to_policy,
-            dim_state=self.args.state_dim,
-            dim_latent=self.args.latent_dim * 2,
-            dim_belief=self.args.belief_dim,
-            dim_task=self.args.task_dim,
-            #
-            hidden_layers=self.args.policy_layers,
-            activation_function=self.args.policy_activation_function,
-            policy_initialisation=self.args.policy_initialisation,
-            #
-            action_space=self.envs.action_space,
-            init_std=self.args.policy_init_std,
-        ).to(device)
+        if self.args.init_model_path is None:
+            policy_net = Policy(
+                args=self.args,
+                #
+                pass_state_to_policy=self.args.pass_state_to_policy,
+                pass_latent_to_policy=self.args.pass_latent_to_policy,
+                pass_belief_to_policy=self.args.pass_belief_to_policy,
+                pass_task_to_policy=self.args.pass_task_to_policy,
+                dim_state=self.args.state_dim,
+                dim_latent=self.args.latent_dim * 2,
+                dim_belief=self.args.belief_dim,
+                dim_task=self.args.task_dim,
+                #
+                hidden_layers=self.args.policy_layers,
+                activation_function=self.args.policy_activation_function,
+                policy_initialisation=self.args.policy_initialisation,
+                #
+                action_space=self.envs.action_space,
+                init_std=self.args.policy_init_std,
+            ).to(device)
+        else:
+            policy_net = torch.load(os.path.join(self.args.init_model_path, 'policy.pt'), map_location=device)
 
         # initialise policy trainer
         if self.args.policy == 'a2c':

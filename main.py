@@ -30,7 +30,10 @@ from metalearner import MetaLearner
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--env-type', default='gridworld_varibad')
+    # continue training an existing model
+    parser.add_argument('--init_model_path', type=str, default=None)
     args, rest_args = parser.parse_known_args()
+    init_model_path = args.init_model_path
     env = args.env_type
 
     # --- GridWorld ---
@@ -122,6 +125,8 @@ def main():
         args = args_humanoid_dir_rl2.get_args(rest_args)
     else:
         raise Exception("Invalid Environment")
+
+    args.init_model_path = init_model_path
 
     # warning for deterministic execution
     if args.deterministic_execution:

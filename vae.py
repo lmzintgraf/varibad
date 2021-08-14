@@ -1,4 +1,5 @@
 import warnings
+import os
 
 import gym
 import numpy as np
@@ -61,19 +62,22 @@ class VaribadVAE:
 
     def initialise_encoder(self):
         """ Initialises and returns an RNN encoder """
-        encoder = RNNEncoder(
-            args=self.args,
-            layers_before_gru=self.args.encoder_layers_before_gru,
-            hidden_size=self.args.encoder_gru_hidden_size,
-            layers_after_gru=self.args.encoder_layers_after_gru,
-            latent_dim=self.args.latent_dim,
-            action_dim=self.args.action_dim,
-            action_embed_dim=self.args.action_embedding_size,
-            state_dim=self.args.state_dim,
-            state_embed_dim=self.args.state_embedding_size,
-            reward_size=1,
-            reward_embed_size=self.args.reward_embedding_size,
-        ).to(device)
+        if self.args.init_model_path is None:
+            encoder = RNNEncoder(
+                args=self.args,
+                layers_before_gru=self.args.encoder_layers_before_gru,
+                hidden_size=self.args.encoder_gru_hidden_size,
+                layers_after_gru=self.args.encoder_layers_after_gru,
+                latent_dim=self.args.latent_dim,
+                action_dim=self.args.action_dim,
+                action_embed_dim=self.args.action_embedding_size,
+                state_dim=self.args.state_dim,
+                state_embed_dim=self.args.state_embedding_size,
+                reward_size=1,
+                reward_embed_size=self.args.reward_embedding_size,
+            ).to(device)
+        else:
+            encoder = torch.load(os.path.join(self.args.init_model_path, 'encoder.pt'), map_location=device)
         return encoder
 
     def initialise_decoder(self):
@@ -89,35 +93,41 @@ class VaribadVAE:
 
         # initialise state decoder for VAE
         if self.args.decode_state:
-            state_decoder = StateTransitionDecoder(
-                args=self.args,
-                layers=self.args.state_decoder_layers,
-                latent_dim=latent_dim,
-                action_dim=self.args.action_dim,
-                action_embed_dim=self.args.action_embedding_size,
-                state_dim=self.args.state_dim,
-                state_embed_dim=self.args.state_embedding_size,
-                pred_type=self.args.state_pred_type,
-            ).to(device)
+            if self.args.init_model_path is None:
+                state_decoder = StateTransitionDecoder(
+                    args=self.args,
+                    layers=self.args.state_decoder_layers,
+                    latent_dim=latent_dim,
+                    action_dim=self.args.action_dim,
+                    action_embed_dim=self.args.action_embedding_size,
+                    state_dim=self.args.state_dim,
+                    state_embed_dim=self.args.state_embedding_size,
+                    pred_type=self.args.state_pred_type,
+                ).to(device)
+            else:
+                state_decoder = torch.load(os.path.join(self.args.init_model_path, 'state_decoder.pt'), map_location=device)
         else:
             state_decoder = None
 
         # initialise reward decoder for VAE
         if self.args.decode_reward:
-            reward_decoder = RewardDecoder(
-                args=self.args,
-                layers=self.args.reward_decoder_layers,
-                latent_dim=latent_dim,
-                state_dim=self.args.state_dim,
-                state_embed_dim=self.args.state_embedding_size,
-                action_dim=self.args.action_dim,
-                action_embed_dim=self.args.action_embedding_size,
-                num_states=self.args.num_states,
-                multi_head=self.args.multihead_for_reward,
-                pred_type=self.args.rew_pred_type,
-                input_prev_state=self.args.input_prev_state,
-                input_action=self.args.input_action,
-            ).to(device)
+            if self.args.init_model_path is None:
+                reward_decoder = RewardDecoder(
+                    args=self.args,
+                    layers=self.args.reward_decoder_layers,
+                    latent_dim=latent_dim,
+                    state_dim=self.args.state_dim,
+                    state_embed_dim=self.args.state_embedding_size,
+                    action_dim=self.args.action_dim,
+                    action_embed_dim=self.args.action_embedding_size,
+                    num_states=self.args.num_states,
+                    multi_head=self.args.multihead_for_reward,
+                    pred_type=self.args.rew_pred_type,
+                    input_prev_state=self.args.input_prev_state,
+                    input_action=self.args.input_action,
+                ).to(device)
+            else:
+                reward_decoder = torch.load(os.path.join(self.args.init_model_path, 'reward_decoder.pt'), map_location=device)
         else:
             reward_decoder = None
 
