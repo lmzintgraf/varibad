@@ -80,7 +80,7 @@ class PointEnv(Env):
     def sample_task(self):
         #goal = self.goal_sampler()
         r = random.uniform(self.bound['r_low'], self.bound['r_high'])
-        angle = random.uniform(self.bound['theta_low'], self.bound['theta_high'])
+        angle = np.deg2rad(random.uniform(self.bound['theta_low'], self.bound['theta_high']))
         goal = r * np.array((np.cos(angle), np.sin(angle)))
         return goal
 

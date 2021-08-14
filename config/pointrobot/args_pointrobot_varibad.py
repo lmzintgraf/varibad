@@ -12,7 +12,7 @@ def get_args(rest_args):
     parser.add_argument('--num_frames', type=int, default=5e7, help='number of frames to train')
     parser.add_argument('--max_rollouts_per_task', type=int, default=3)
     parser.add_argument('--exp_label', default='varibad', help='label (typically name of method)')
-    parser.add_argument('--env_name', default='SparsePointEnv-v0', help='environment to train on')
+    parser.add_argument('--env_name', default='PointEnv-v0', help='environment to train on')
 
     # --- POLICY ---
 
