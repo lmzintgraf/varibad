@@ -32,8 +32,10 @@ def main():
     parser.add_argument('--env-type', default='gridworld_varibad')
     # continue training an existing model
     parser.add_argument('--init_model_path', type=str, default=None)
+    parser.add_argument('--single_task_seed', type=int, default=0)
     args, rest_args = parser.parse_known_args()
     init_model_path = args.init_model_path
+    single_task_seed = args.single_task_seed
     env = args.env_type
 
     # --- GridWorld ---
@@ -127,6 +129,7 @@ def main():
         raise Exception("Invalid Environment")
 
     args.init_model_path = init_model_path
+    args.single_task_seed = single_task_seed
 
     # warning for deterministic execution
     if args.deterministic_execution:

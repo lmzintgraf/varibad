@@ -64,6 +64,8 @@ class MetaLearner:
         else:
             self.train_tasks = None
 
+        print (self.envs.get_task())
+
         # calculate what the maximum length of the trajectories is
         self.args.max_trajectory_len = self.envs._max_episode_steps
         self.args.max_trajectory_len *= self.args.max_rollouts_per_task

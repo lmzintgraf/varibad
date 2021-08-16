@@ -52,6 +52,7 @@ class PointEnv(Env):
         else:
             raise NotImplementedError(goal_sampler)
         '''
+        self.args = kwargs['args']
         goal_sampler = kwargs['args'].goal_sampler
         if goal_sampler == 'close':
             self.bound = {'r_low': 0., 'r_high': 1., 'theta_low': -180, 'theta_high': 180}
@@ -79,6 +80,8 @@ class PointEnv(Env):
 
     def sample_task(self):
         #goal = self.goal_sampler()
+        if self.args.single_task_mode:
+            random.seed(self.args.single_task_seed)
         r = random.uniform(self.bound['r_low'], self.bound['r_high'])
         angle = np.deg2rad(random.uniform(self.bound['theta_low'], self.bound['theta_high']))
         goal = r * np.array((np.cos(angle), np.sin(angle)))
