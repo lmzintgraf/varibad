@@ -304,6 +304,31 @@ class MetaLearner:
             # clean up after update
             self.policy_storage.after_update()
 
+        # save the model after training
+        save_path = os.path.join(self.logger.full_output_folder, 'models')
+        if not os.path.exists(save_path):
+            os.mkdir(save_path)
+
+        idx_labels = ['']
+        if self.args.save_intermediate_models:
+            idx_labels.append(int(self.iter_idx))
+
+        for idx_label in idx_labels:
+
+            torch.save(self.policy.actor_critic, os.path.join(save_path, f"policy{idx_label}.pt"))
+            torch.save(self.vae.encoder, os.path.join(save_path, f"encoder{idx_label}.pt"))
+            if self.vae.state_decoder is not None:
+                torch.save(self.vae.state_decoder, os.path.join(save_path, f"state_decoder{idx_label}.pt"))
+            if self.vae.reward_decoder is not None:
+                torch.save(self.vae.reward_decoder, os.path.join(save_path, f"reward_decoder{idx_label}.pt"))
+            if self.vae.task_decoder is not None:
+                torch.save(self.vae.task_decoder, os.path.join(save_path, f"task_decoder{idx_label}.pt"))
+
+            # save normalisation params of envs
+            if self.args.norm_rew_for_policy:
+                rew_rms = self.envs.venv.ret_rms
+                utl.save_obj(rew_rms, save_path, f"env_rew_rms{idx_label}")
+
         self.envs.close()
 
     def encode_running_trajectory(self):

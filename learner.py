@@ -165,6 +165,7 @@ class Learner:
 
         # reset environments
         state, belief, task = utl.reset_env(self.envs, self.args)
+        print (self.envs.get_task())
 
         # insert initial observation / embeddings to rollout storage
         self.policy_storage.prev_state[0].copy_(state)
@@ -230,6 +231,24 @@ class Learner:
 
             # clean up after update
             self.policy_storage.after_update()
+
+        # save the final model after update
+        save_path = os.path.join(self.logger.full_output_folder, 'models')
+        if not os.path.exists(save_path):
+            os.mkdir(save_path)
+
+        idx_labels = ['']
+        if self.args.save_intermediate_models:
+            idx_labels.append(int(self.iter_idx))
+
+        for idx_label in idx_labels:
+
+            torch.save(self.policy.actor_critic, os.path.join(save_path, f"policy{idx_label}.pt"))
+
+            # save normalisation params of envs
+            if self.args.norm_rew_for_policy:
+                rew_rms = self.envs.venv.ret_rms
+                utl.save_obj(rew_rms, save_path, f"env_rew_rms{idx_label}")
 
     def get_value(self, state, belief, task):
         return self.policy.actor_critic.get_value(state=state, belief=belief, task=task, latent=None).detach()
