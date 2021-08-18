@@ -41,8 +41,8 @@ register(
     'HalfCheetahVel-v0',
     entry_point='environments.wrappers:mujoco_wrapper',
     kwargs={'entry_point': 'environments.mujoco.half_cheetah_vel:HalfCheetahVelEnv',
-            'max_episode_steps': 200},
-    max_episode_steps=200
+            'max_episode_steps': 100},
+    max_episode_steps=100
 )
 
 register(

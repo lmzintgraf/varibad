@@ -6,6 +6,7 @@ def get_args(rest_args):
     parser = argparse.ArgumentParser()
 
     # --- GENERAL ---
+    parser.add_argument('--vel_lower_bound', type=float, default=0., help='the lower bound of the velocity space')
 
     parser.add_argument('--num_frames', type=int, default=1e8, help='number of frames to train')
     parser.add_argument('--max_rollouts_per_task', type=int, default=2, help='number of MDP episodes for adaptation')
