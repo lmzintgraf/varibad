@@ -47,6 +47,8 @@ def evaluate(args,
                          args=args
                          )
     num_steps = envs._max_episode_steps
+    #print (num_steps)
+    #print (envs.get_task())
 
     # reset environments
     state, belief, task = utl.reset_env(envs, args)

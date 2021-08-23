@@ -82,8 +82,7 @@ register(
     'SparsePointEnv-v0',
     entry_point='environments.navigation.point_robot:SparsePointEnv',
     kwargs={'goal_radius': 0.2,
-            'max_episode_steps': 100,
-            'goal_sampler': 'semi-circle'
+            'max_episode_steps': 100
             },
     max_episode_steps=100,
 )

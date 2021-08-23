@@ -315,16 +315,43 @@ class PointEnv(Env):
 class SparsePointEnv(PointEnv):
     """ Reward is L2 distance given only within goal radius """
 
-    def __init__(self, goal_radius=0.2, max_episode_steps=100, goal_sampler='semi-circle'):
-        super().__init__(max_episode_steps=max_episode_steps, goal_sampler=goal_sampler)
+    def __init__(self, goal_radius=0.2, max_episode_steps=100, **kwargs):
+
+        self.args = kwargs['args']
+        goal_sampler = kwargs['args'].goal_sampler
+        if goal_sampler == 'left':
+            self.bound = {'theta_low': 3. * np.pi / 4., 'theta_high': 5. * np.pi / 4.}
+        elif goal_sampler == 'right':
+            self.bound = {'theta_low': -np.pi / 4., 'theta_high': np.pi / 4.}
+        elif goal_sampler == 'up':
+            self.bound = {'theta_low': np.pi / 4., 'theta_high': 3. * np.pi / 4.}
+        elif goal_sampler == 'bottom':
+            self.bound = {'theta_low': -3. * np.pi / 4, 'theta_high': -np.pi / 4.}
+        else:
+            raise NotImplementedError(goal_sampler)
+
         self.goal_radius = goal_radius
         self.reset_task()
+        self.task_dim = 2
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(2,))
+        # we convert the actions from [-1, 1] to [-0.1, 0.1] in the step() function
+        self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(2,))
+        self._max_episode_steps = max_episode_steps
 
     def sparsify_rewards(self, r):
         ''' zero out rewards when outside the goal radius '''
         mask = (r >= -self.goal_radius).astype(np.float32)
         r = r * mask
         return r
+
+    def sample_task(self):
+        #goal = self.goal_sampler()
+        if self.args.single_task_mode:
+            random.seed(self.args.single_task_seed)
+        r = 1.
+        angle = random.uniform(self.bound['theta_low'], self.bound['theta_high'])
+        goal = r * np.array((np.cos(angle), np.sin(angle)))
+        return goal
 
     def reset_model(self):
         self._state = np.array([0, 0])
