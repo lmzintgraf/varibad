@@ -54,20 +54,14 @@ class PointEnv(Env):
         '''
         self.args = kwargs['args']
         goal_sampler = kwargs['args'].goal_sampler
-        if goal_sampler == 'close':
-            self.bound = {'r_low': 0., 'r_high': 1., 'theta_low': -180, 'theta_high': 180}
-        elif goal_sampler == 'mid':
-            self.bound = {'r_low': 1., 'r_high': 1.5, 'theta_low': -180, 'theta_high': 180}
-        elif goal_sampler == 'far':
-            self.bound = {'r_low': 1.5, 'r_high': 2., 'theta_low': -180, 'theta_high': 180}
-        elif goal_sampler == 'left':
-            self.bound = {'r_low': 0., 'r_high': 1., 'theta_low': 90, 'theta_high': 270}
+        if goal_sampler == 'left':
+            self.bound = {'theta_low': 3. * np.pi / 4., 'theta_high': 5. * np.pi / 4.}
         elif goal_sampler == 'right':
-            self.bound = {'r_low': 0., 'r_high': 1., 'theta_low': -90, 'theta_high': 90}
+            self.bound = {'theta_low': -np.pi / 4., 'theta_high': np.pi / 4.}
         elif goal_sampler == 'up':
-            self.bound = {'r_low': 0., 'r_high': 1., 'theta_low': 0, 'theta_high': 180}
+            self.bound = {'theta_low': np.pi / 4., 'theta_high': 3. * np.pi / 4.}
         elif goal_sampler == 'bottom':
-            self.bound = {'r_low': 0., 'r_high': 1., 'theta_low': -180, 'theta_high': 0}
+            self.bound = {'theta_low': -3. * np.pi / 4, 'theta_high': -np.pi / 4.}
         else:
             raise NotImplementedError(goal_sampler)
 
@@ -82,9 +76,8 @@ class PointEnv(Env):
         #goal = self.goal_sampler()
         if self.args.single_task_mode:
             random.seed(self.args.single_task_seed)
-        r = random.uniform(self.bound['r_low'], self.bound['r_high'])
-        angle = np.deg2rad(random.uniform(self.bound['theta_low'], self.bound['theta_high']))
-        goal = r * np.array((np.cos(angle), np.sin(angle)))
+        angle = random.uniform(self.bound['theta_low'], self.bound['theta_high'])
+        goal = 1. * np.array((np.cos(angle), np.sin(angle)))
         return goal
 
     def set_task(self, task):
