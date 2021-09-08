@@ -9,7 +9,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class AntEnv(MujocoEnv):
-    def __init__(self, use_low_gear_ratio=False):
+    def __init__(self, use_low_gear_ratio=False, **kwargs):
         self.init_serialization(locals())
         if use_low_gear_ratio:
             xml_path = 'low_gear_ratio_ant.xml'

@@ -2,6 +2,7 @@ import random
 
 import numpy as np
 import torch
+from gym import spaces
 
 from environments.mujoco.half_cheetah import HalfCheetahEnv
 
@@ -66,3 +67,37 @@ class HalfCheetahDirEnv(HalfCheetahEnv):
         if task is None:
             task = self.sample_tasks(1)[0]
         self.set_task(task)
+
+
+_ANT_DIR_ACTION_DIM = 8
+_ANT_DIR_OBS_DIM = 28
+
+_CHEETAH_DIR_ACTION_DIM = 6
+_CHEETAH_DIR_OBS_DIM = 21
+
+
+class CheetahDirUniEnv(HalfCheetahDirEnv):
+    """Has the same action and state dim as AntDir."""
+    def __init__(self, max_episode_steps=200, **kwargs):
+        self.orig_action_dim = _CHEETAH_DIR_ACTION_DIM
+        self.obs_dim_added = _ANT_DIR_OBS_DIM - _CHEETAH_DIR_OBS_DIM
+        # initialise original cheetah env
+        super().__init__(max_episode_steps, **kwargs)
+        # overriding action space
+        self.action_space = spaces.Box(low=np.concatenate((self.action_space.low,
+                                                           -np.ones(_ANT_DIR_ACTION_DIM-self.orig_action_dim))),
+                                       high=np.concatenate((self.action_space.high,
+                                                            np.ones(_ANT_DIR_ACTION_DIM-self.orig_action_dim))),
+                                       shape=(_ANT_DIR_ACTION_DIM,))
+        # Note: the observation space is automatically generated from the _get_obs function, so we don't overwrite it
+
+    def _get_obs(self):
+        obs = super()._get_obs()
+        # add zeros to match observation space we defined above
+        obs = np.concatenate((obs, np.zeros(self.obs_dim_added)))
+        return obs
+
+    def step(self, action):
+        # remove unused zeros
+        action = action[:self.orig_action_dim]
+        return super().step(action)
