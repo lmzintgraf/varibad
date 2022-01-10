@@ -17,7 +17,7 @@ Yarin Gal, Katja Hofmann, Shimon Whiteson, published at ICLR 2020.
 > If you use this code with your own environments, 
 > make sure to not use `np.random` in them 
 > (e.g. to generate the tasks) because it is not thread safe 
-> (and not using it may cause duplicates across threads).
+> (and it may cause duplicates across threads).
 > Instead, use the python native random function. 
 > For an example see
 > [here](https://github.com/lmzintgraf/varibad/blob/master/environments/mujoco/ant_goal.py#L38).
