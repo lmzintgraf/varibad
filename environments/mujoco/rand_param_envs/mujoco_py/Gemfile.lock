@@ -20,7 +20,7 @@ GEM
       slop (~> 3.4)
     slop (3.6.0)
     thread_safe (0.3.6)
-    tzinfo (1.2.6)
+    tzinfo (1.2.10)
       thread_safe (~> 0.1)
 
 PLATFORMS
